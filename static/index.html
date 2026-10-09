@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <link rel="manifest" href="/manifest.json">
+    <title>IlmiDev - YouTube & TikTok Downloader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        /* Minimalist loader */
+        .loader {
+            border-top-color: #000;
+            -webkit-animation: spinner 1s linear infinite;
+            animation: spinner 1s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <script>
+        // Set up persistent device ID
+        let deviceId = localStorage.getItem('device_id');
+        if (!deviceId) {
+            deviceId = 'dev_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+            localStorage.setItem('device_id', deviceId);
+        }
+
+        
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans antialiased min-h-screen flex flex-col items-center justify-between py-10 px-4 transition-colors duration-200">
+
+    <div class="w-full max-w-lg bg-white border-2 border-black rounded-2xl p-6 mb-8 transition-colors duration-200 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+        <h1 class="text-3xl font-extrabold text-center text-blue-600 mb-2">Ilmi<span class="text-black">Dev</span></h1>
+        <p class="text-center text-gray-500 mb-8 font-medium">Download YouTube & TikTok</p>
+
+        <!-- Input Section -->
+        <form id="url-form" class="mb-6 flex flex-col gap-4 relative">
+            <div class="relative">
+                <input type="text" id="url-input" required placeholder="Masukkan link atau cari judul..."
+                    class="w-full p-4 pr-24 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-black:border-zinc-600 focus:ring-0 bg-gray-50 text-black placeholder-gray-400 transition-colors">
+                <button type="button" id="paste-btn"
+                    class="absolute right-2 top-2 bottom-2 bg-white border-2 border-gray-200 text-gray-700 hover:bg-gray-100:bg-zinc-700 px-4 font-bold rounded-lg transition-colors">
+                    Paste
+                </button>
+            </div>
+            <!-- Search Results Auto-dropdown (hidden by default) -->
+            <div id="search-results" class="hidden absolute top-[72px] left-0 right-0 bg-white border-2 border-gray-200 rounded-xl shadow-2xl_8px_30px_rgba(0,0,0,0.8)] z-50 max-h-64 overflow-y-auto">
+                <div id="search-list" class="flex flex-col">
+                    <!-- Search items will be injected here -->
+                </div>
+            </div>
+            <button type="submit" id="submit-btn"
+                class="w-full bg-blue-600 hover:bg-blue-700:bg-gray-200 text-white font-bold py-4 px-4 rounded-xl transition-colors">
+                Cari / Download
+            </button>
+        </form>
+
+        <!-- Loading state -->
+        <div id="loading" class="hidden flex-col items-center justify-center py-8">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-300 h-12 w-12 mb-4"></div>
+            <p class="text-gray-500 font-medium">Sedang memproses...</p>
+        </div>
+
+        <!-- Error state -->
+        <div id="error" class="hidden bg-red-50 border-2 border-red-200 text-red-600 p-4 mb-6 rounded-xl transition-colors">
+            <p class="font-bold">Gagal</p>
+            <p id="error-msg" class="text-sm">Gagal mengambil data.</p>
+        </div>
+
+        <!-- Result Card -->
+        <div id="result" class="hidden flex-col gap-4 mt-6">
+            <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-white p-4 rounded-xl border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-colors">
+                <img id="thumb" referrerpolicy="no-referrer" class="w-full sm:w-32 aspect-video object-cover rounded-lg border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] flex-shrink-0" src="" alt="Thumbnail">
+                <div class="flex-1 min-w-0 w-full">
+                    <h3 id="title" class="text-md sm:text-lg font-extrabold text-black line-clamp-2" title="Judul">Judul</h3>
+                    <p id="uploader" class="text-xs sm:text-sm font-bold text-gray-600 truncate mt-1 uppercase tracking-wide">Uploader</p>
+                    <p id="platform" class="text-[10px] font-bold mt-2.5 px-2.5 py-1 bg-black text-white rounded-md inline-block uppercase tracking-wider">YouTube</p>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h4 class="text-sm font-bold text-black uppercase mb-3">Format:</h4>
+                <div id="format-list" class="flex flex-col gap-3">
+                    <!-- Format buttons will be injected here -->
+                </div>
+            </div>
+
+            <div id="audio-stream" class="hidden mt-4 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] rounded-xl p-4 transition-colors">
+                <h4 class="text-sm font-bold text-black uppercase mb-3">Putar Audio</h4>
+                <audio id="audio-player" controls preload="metadata" class="w-full"></audio>
+                <p id="audio-status" class="text-xs text-black mt-3 font-bold">Putar langsung tanpa mengunduh.</p>
+            </div>
+
+            <div id="video-stream" class="hidden mt-4 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] rounded-xl p-4 transition-colors">
+                <h4 class="text-sm font-bold text-black uppercase mb-3">Putar Video</h4>
+                <video id="video-player" controls preload="metadata" playsinline class="w-full aspect-video rounded-lg border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)]"></video>
+                <p id="video-status" class="text-xs text-black mt-3 font-bold">Streaming video langsung.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-auto text-sm text-black w-full max-w-lg pb-6 transition-colors font-medium">
+        <div id="usage-info" class="text-xs mb-4 bg-white border-2 border-black rounded-lg py-2 px-4 inline-block font-bold uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+            <span id="ui-count">Ekstrak: -/20</span> <span class="mx-1 text-gray-400">|</span> 
+            <span id="ui-duration">Sisa Kuota Download: -</span>
+        </div>
+        <p class="mb-2">Gunakan untuk keperluan pribadi.</p>
+        <p class="font-medium">
+            &copy; 2026 <a href="#" class="text-blue-500 hover:text-blue-600:text-blue-400 font-bold transition-colors">IlmiDev</a>
+        </p>
+    </div>
+
+    <script>
+        const form = document.getElementById('url-form');
+        const input = document.getElementById('url-input');
+        const pasteBtn = document.getElementById('paste-btn');
+        const loading = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const errorMsg = document.getElementById('error-msg');
+        const result = document.getElementById('result');
+        const submitBtn = document.getElementById('submit-btn');
+
+        function checkScrollState() {
+            const isResultHidden = result.classList.contains('hidden');
+            const isErrorHidden = errorDiv.classList.contains('hidden');
+            if (isResultHidden && isErrorHidden) {
+                document.body.classList.add('overflow-hidden');
+            } else {
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+        
+        // Panggil saat pertama kali load
+        checkScrollState();
+
+        pasteBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                input.value = text;
+            } catch (err) {
+                alert('Gagal membaca clipboard. Berikan izin atau paste manual.');
+            }
+        });
+
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds) return '0:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        async function updateUsageInfo() {
+            try {
+                const res = await fetch(`/api/limits?device_id=${deviceId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    const isUnli = data.max_count > 1000;
+                    document.getElementById('ui-count').textContent = isUnli 
+                        ? `Ekstrak: UNLI` 
+                        : `Ekstrak: ${data.count}/${data.max_count}`;
+                    
+                    const leftSeconds = Math.max(0, data.max_duration - data.duration);
+                    const leftMins = Math.floor(leftSeconds / 60);
+                    document.getElementById('ui-duration').textContent = `Sisa Kuota Download: ${leftMins} menit`;
+                }
+            } catch (err) {
+                // Abaikan jika gagal memuat info usage
+            }
+        }
+        updateUsageInfo();
+
+        let searchTimeout;
+        const searchResultsContainer = document.getElementById('search-results');
+        const searchList = document.getElementById('search-list');
+
+        // Realtime typing search handler
+        input.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            clearTimeout(searchTimeout);
+
+            // Hide if empty or is URL
+            if (!val || val.startsWith('http')) {
+                searchResultsContainer.classList.add('hidden');
+                return;
+            }
+
+            if (val.startsWith('#') && val.replace(/^#\s*/, '').length === 0) {
+                searchResultsContainer.classList.add('hidden');
+                return;
+            }
+
+            // Set small loading state in dropdown
+            searchResultsContainer.classList.remove('hidden');
+            searchList.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">Mencari...</div>';
+
+            // Debounce 500ms
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch('/api/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: val, device_id: deviceId })
+                    });
+                    const data = await res.json();
+
+                    searchList.innerHTML = '';
+                    if (!res.ok || !data.results || data.results.length === 0) {
+                        searchList.innerHTML = '<div class="p-4 text-center text-red-500 text-sm">Tidak ada hasil.</div>';
+                        return;
+                    }
+
+                    data.results.forEach(video => {
+                        const item = document.createElement('div');
+                        item.className = 'flex flex-row gap-3 p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition items-center';
+                        item.innerHTML = `
+                            <img src="${video.thumbnail}" alt="Thumb" referrerpolicy="no-referrer" class="w-16 h-12 object-cover rounded shadow-sm bg-gray-200 flex-shrink-0">
+                            <div class="flex flex-col flex-1 min-w-0">
+                                <div class="font-semibold text-sm text-gray-800 truncate">${video.title}</div>
+                                <div class="flex justify-between items-center mt-1 text-xs text-gray-500">
+                                    <span class="truncate">${video.uploader}</span>
+                                    <span class="bg-gray-200 px-1.5 py-0.5 rounded text-[10px] flex-shrink-0">${formatDuration(video.duration)}</span>
+                                </div>
+                            </div>
+                        `;
+                        // Click is now safe since we removed the input blur hide logic
+                        item.addEventListener('click', async (e) => {
+                            e.preventDefault();
+                            input.value = video.url;
+                            searchResultsContainer.classList.add('hidden');
+
+                            // Call processUrl directly instead of relying on submit event
+                            // This bypasses any weird form event blocking by the browser
+                            result.classList.add('hidden');
+                            errorDiv.classList.add('hidden');
+                            loading.classList.remove('hidden');
+                            submitBtn.disabled = true;
+                            submitBtn.classList.add('opacity-50');
+
+                            try {
+                                await processUrl(video.url);
+                            } catch (err) {
+                                loading.classList.add('hidden');
+                                errorMsg.textContent = err.message;
+                                errorDiv.classList.remove('hidden');
+                            } finally {
+                                submitBtn.disabled = false;
+                                submitBtn.classList.remove('opacity-50');
+                            }
+                        });
+                        searchList.appendChild(item);
+                    });
+                } catch (err) {
+                    searchList.innerHTML = '<div class="p-4 text-center text-red-500 text-sm">Gagal memuat hasil.</div>';
+                }
+            }, 600); // 600ms debounce
+        });
+
+        // Hide search results if clicked outside
+        document.addEventListener('mousedown', (e) => {
+            if (!input.contains(e.target) && !searchResultsContainer.contains(e.target)) {
+                searchResultsContainer.classList.add('hidden');
+            }
+        });
+
+        // Show search results on focus if not empty/URL
+        input.addEventListener('focus', () => {
+            const val = input.value.trim();
+            if (val && !val.startsWith('http') && searchList.innerHTML.trim() !== '') {
+                searchResultsContainer.classList.remove('hidden');
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const inputVal = input.value.trim();
+            if(!inputVal) return;
+
+            const isUrl = inputVal.startsWith('http://') || inputVal.startsWith('https://');
+            
+            if (!isUrl) {
+                // Jangan lakukan apapun jika bukan link (mencegah submit saat tekan Enter untuk pencarian).
+                // Pencarian otomatis ditangani oleh event 'input' (realtime typing) di bawah.
+                return;
+            }
+
+            clearTimeout(searchTimeout);
+
+            // Reset UI
+            result.classList.add('hidden');
+            document.getElementById('search-results').classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            loading.classList.remove('hidden');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50');
+            checkScrollState();
+
+            try {
+                await processUrl(inputVal);
+            } catch (err) {
+                loading.classList.add('hidden');
+                errorMsg.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+                checkScrollState();
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50');
+            }
+        });
+
+        async function processSearch(query) {
+            // User hit Enter/Submit directly on a text query
+            // Programmatically trigger the search and show dropdown
+            searchResultsContainer.classList.remove('hidden');
+            searchList.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">Mencari...</div>';
+
+            const res = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query, device_id: deviceId })
+            });
+
+            const data = await res.json();
+            searchList.innerHTML = '';
+
+            if (!res.ok || !data.results || data.results.length === 0) {
+                searchList.innerHTML = '<div class="p-4 text-center text-red-500 text-sm">Tidak ada hasil.</div>';
+                return;
+            }
+
+            data.results.forEach(video => {
+                const item = document.createElement('div');
+                item.className = 'flex flex-row gap-3 p-3 bg-white border-b-2 border-black hover:bg-black hover:text-white cursor-pointer transition-colors items-center group';
+                item.innerHTML = `
+                    <div class="relative w-24 flex-shrink-0">
+                        <img src="${video.thumbnail}" alt="Thumb" referrerpolicy="no-referrer" class="w-full aspect-video object-cover rounded-md border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                    </div>
+                    <div class="flex flex-col flex-1 min-w-0">
+                        <div class="font-bold text-sm text-black group-hover:text-white line-clamp-2 transition-colors">${video.title}</div>
+                        <div class="flex justify-between items-center mt-2 text-xs font-bold text-gray-500 group-hover:text-gray-300 uppercase tracking-wide transition-colors">
+                            <span class="truncate pr-2">${video.uploader}</span>
+                            <span class="bg-gray-200 text-black px-2 py-0.5 rounded-md flex-shrink-0 border-2 border-black">${formatDuration(video.duration)}</span>
+                        </div>
+                    </div>
+                `;
+                item.addEventListener('mousedown', async (e) => {
+                    e.preventDefault();
+                    input.value = video.url;
+                    searchResultsContainer.classList.add('hidden');
+
+                    result.classList.add('hidden');
+                    errorDiv.classList.add('hidden');
+                    loading.classList.remove('hidden');
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('opacity-50');
+
+                    try {
+                        await processUrl(video.url);
+                    } catch (err) {
+                        loading.classList.add('hidden');
+                        errorMsg.textContent = err.message;
+                        errorDiv.classList.remove('hidden');
+                    } finally {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('opacity-50');
+                    }
+                });
+                searchList.appendChild(item);
+            });
+
+            loading.classList.add('hidden');
+        }
+
+        async function processUrl(url) {
+            const res = await fetch('/api/info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url, device_id: deviceId })
+            });
+            
+            updateUsageInfo();
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Terjadi kesalahan saat memproses URL');
+
+            // Populate UI
+            document.getElementById('title').textContent = data.title;
+            document.getElementById('title').title = data.title;
+            document.getElementById('uploader').textContent = data.uploader;
+            document.getElementById('thumb').src = data.thumbnail || 'https://via.placeholder.com/150';
+
+            const platformBadge = document.getElementById('platform');
+            platformBadge.textContent = data.platform.toUpperCase();
+            if(data.platform === 'youtube') {
+                platformBadge.className = 'text-[10px] font-bold mt-2 px-2.5 py-1 bg-red-100 text-red-700 border border-transparent rounded-md inline-block uppercase tracking-wide';
+            } else if(data.platform === 'tiktok') {
+                platformBadge.className = 'text-[10px] font-bold mt-2 px-2.5 py-1 bg-black text-white border border-transparent rounded-md inline-block uppercase tracking-wide';
+            } else {
+                platformBadge.className = 'text-[10px] font-bold mt-2 px-2.5 py-1 bg-gray-200 text-gray-700 border border-transparent rounded-md inline-block uppercase tracking-wide';
+            }
+
+            const formatList = document.getElementById('format-list');
+            formatList.innerHTML = '';
+
+            data.formats.forEach(fmt => {
+                const btn = document.createElement('a');
+                btn.href = `/api/dl?id=${data.id}&fmt=${fmt.key}&device_id=${deviceId}`;
+                btn.className = 'group flex items-center justify-between bg-white hover:bg-black border-2 border-black text-black hover:text-white py-3.5 px-4 rounded-xl transition-all duration-200 ease-in-out cursor-pointer active:scale-95 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-none';
+
+                const sizeStr = fmt.size ? formatBytes(fmt.size) : (fmt.key === 'mp3' ? '~ Instan' : 'Unknown Size');
+
+                btn.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 opacity-90 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span class="font-bold text-sm sm:text-base">${fmt.label}</span>
+                    </div>
+                    <span class="text-[11px] font-extrabold border-2 border-current px-2.5 py-1 rounded-md transition-colors bg-white text-black group-hover:bg-black group-hover:text-white">${sizeStr}</span>
+                `;
+                formatList.appendChild(btn);
+            });
+
+            const audioStream = document.getElementById('audio-stream');
+            const audioPlayer = document.getElementById('audio-player');
+            const audioStatus = document.getElementById('audio-status');
+            
+            const videoStream = document.getElementById('video-stream');
+            const videoPlayer = document.getElementById('video-player');
+            const formatListContainer = document.getElementById('format-list').parentElement;
+
+            formatListContainer.classList.remove('hidden');
+            videoStream.classList.add('hidden');
+            videoPlayer.removeAttribute('src');
+            videoPlayer.load();
+
+            const hasMp3 = data.formats.some(f => f.key === 'mp3');
+            
+            let hlsInstance = null;
+            if (data.platform === 'xnxx') {
+                // Sembunyikan daftar format dan stream audio
+                formatListContainer.classList.add('hidden');
+                audioStream.classList.add('hidden');
+                
+                // Tampilkan video player
+                videoStream.classList.remove('hidden');
+                videoPlayer.removeAttribute('src');
+                videoPlayer.poster = data.thumbnail || '';
+                
+                const hlsFormat = data.formats.find(f => f.key === 'hls');
+                const mp4Format = data.formats.find(f => f.key === 'mp4');
+                
+                if (hlsFormat && Hls.isSupported()) {
+                    if (window.hlsInstance) window.hlsInstance.destroy();
+                    window.hlsInstance = new Hls();
+                    window.hlsInstance.loadSource(`/api/proxy_hls?url=${encodeURIComponent(hlsFormat.url)}`);
+                    window.hlsInstance.attachMedia(videoPlayer);
+                } else if (mp4Format) {
+                    videoPlayer.src = `/api/dl?id=${data.id}&fmt=mp4&stream=1&device_id=${deviceId}`;
+                    videoPlayer.load();
+                } else if (hlsFormat && videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Fallback untuk Safari
+                    videoPlayer.src = `/api/proxy_hls?url=${encodeURIComponent(hlsFormat.url)}`;
+                    videoPlayer.load();
+                }
+            } else if (data.platform === 'youtube' && hasMp3) {
+                audioStream.classList.remove('hidden');
+                audioPlayer.removeAttribute('src');
+                audioPlayer.load();
+                
+                audioPlayer.preload = 'metadata';
+                // Gunakan MP3 stream on-the-fly yang mendukung seek (agar bisa background play di mobile)
+                audioPlayer.src = `/api/dl?id=${data.id}&fmt=mp3&stream=1&device_id=${deviceId}`;
+                audioPlayer.load();
+                
+                audioPlayer.preload = 'metadata';
+                // Gunakan MP3 stream on-the-fly yang mendukung seek (agar bisa background play di mobile)
+                audioPlayer.src = `/api/dl?id=${data.id}&fmt=mp3&stream=1`;
+                audioPlayer.load();
+                audioStatus.textContent = 'Menyiapkan audio...';
+                
+                // Gunakan MediaSession API agar notifikasi HP menampilkan 'IlmiDev Audio'
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: data.title,
+                        artist: 'IlmiDev Audio',
+                        album: data.uploader || 'YouTube',
+                        artwork: [
+                            { src: data.thumbnail || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }
+                        ]
+                    });
+
+                    // Action handlers untuk interaksi dari notifikasi/lock screen
+                    navigator.mediaSession.setActionHandler('play', () => audioPlayer.play());
+                    navigator.mediaSession.setActionHandler('pause', () => audioPlayer.pause());
+                    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                        audioPlayer.currentTime = Math.max(audioPlayer.currentTime - (details.seekOffset || 10), 0);
+                    });
+                    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                        audioPlayer.currentTime = Math.min(audioPlayer.currentTime + (details.seekOffset || 10), audioPlayer.duration);
+                    });
+                    navigator.mediaSession.setActionHandler('seekto', (details) => {
+                        if (details.fastSeek && 'fastSeek' in audioPlayer) {
+                            audioPlayer.fastSeek(details.seekTime);
+                        } else {
+                            audioPlayer.currentTime = details.seekTime;
+                        }
+                    });
+                }
+                
+                audioPlayer.onloadedmetadata = () => {
+                    audioStatus.textContent = 'Siap diputar. Klik play untuk memulai.';
+                };
+                audioPlayer.onerror = () => {
+                    const codes = {1:'dibatalkan',2:'jaringan',3:'decode',4:'format tidak didukung'};
+                    audioStatus.textContent = 'Gagal memuat audio (error ' + (codes[audioPlayer.error?.code] || 'tidak diketahui') + '). Coba muat ulang URL.';
+                };
+            } else {
+                audioPlayer.removeAttribute('src');
+                audioPlayer.load();
+                audioStream.classList.add('hidden');
+            }
+
+            loading.classList.add('hidden');
+            result.classList.remove('hidden');
+            checkScrollState();
+        }
+
+        // Logic Dark Mode Toggle
+        
+        
+        
+
+        // Easter Egg Logic
+        let pressTimer;
+        const startPress = (e) => {
+            // Hanya klik kiri mouse atau touch screen
+            if (e.type === 'mousedown' && e.button !== 0) return;
+            pressTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch('/api/unlock', { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ device_id: deviceId })
+                    });
+                    if (res.ok) {
+                        alert("🎉 Easter Egg Unlocked! Limit Ekstrak: UNLIMITED, Kuota Download: 5 Jam.");
+                        updateUsageInfo();
+                    } else {
+                        const errData = await res.json();
+                        alert("Gagal: " + (errData.detail || "Tidak diketahui"));
+                    }
+                } catch(e) {}
+            }, 7000); // Tahan 7 detik
+        };
+
+        const cancelPress = () => {
+            clearTimeout(pressTimer);
+        };
+
+        submitBtn.addEventListener('mousedown', startPress);
+        submitBtn.addEventListener('touchstart', startPress, {passive: true});
+        submitBtn.addEventListener('mouseup', cancelPress);
+        submitBtn.addEventListener('mouseleave', cancelPress);
+        submitBtn.addEventListener('touchend', cancelPress);
+
+        // Sinkronisasi status Playback ke MediaSession API
+        const audioEl = document.getElementById('audio-player');
+        
+        audioEl.addEventListener('play', () => {
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+        });
+        audioEl.addEventListener('pause', () => {
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+        });
+        audioEl.addEventListener('ended', () => {
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+        });
+
+        const updatePositionState = () => {
+            if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+                if (isFinite(audioEl.duration) && audioEl.duration > 0) {
+                    try {
+                        navigator.mediaSession.setPositionState({
+                            duration: audioEl.duration,
+                            playbackRate: audioEl.playbackRate,
+                            position: audioEl.currentTime
+                        });
+                    } catch(e) {}
+                }
+            }
+        };
+
+        audioEl.addEventListener('timeupdate', () => {
+            // Update position (throttled tiap 1 detik)
+            if (!audioEl._lastUpdate || performance.now() - audioEl._lastUpdate > 1000) {
+                updatePositionState();
+                audioEl._lastUpdate = performance.now();
+            }
+        });
+        audioEl.addEventListener('loadedmetadata', updatePositionState);
+
+    </script>
+</body>
+</html>
