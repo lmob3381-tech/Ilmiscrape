@@ -149,7 +149,20 @@
 
                     <!-- Overlay Controls (auto-hides after 2.5s while playing) -->
                     <div id="video-controls-overlay" class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-8 pb-3 px-3.5 text-white transition-opacity duration-300 opacity-100 z-10 flex flex-col gap-1.5">
-                        <input id="video-seek" type="range" min="0" max="1000" value="0" aria-label="Posisi video" class="w-full h-1.5 cursor-pointer accent-blue-500">
+                        <!-- Seek bar with loaded buffer progress indicator -->
+                        <div class="relative w-full h-4 flex items-center cursor-pointer select-none group/seek">
+                            <!-- Background Track -->
+                            <div class="absolute inset-x-0 h-1 rounded-full bg-white/20 overflow-hidden pointer-events-none transition-all group-hover/seek:h-1.5">
+                                <!-- Buffer Progress Bar (Loaded Ahead) -->
+                                <div id="video-buffer-bar" class="absolute top-0 bottom-0 left-0 bg-white/45 transition-all duration-150" style="width: 0%;"></div>
+                                <!-- Current Play Progress Bar -->
+                                <div id="video-play-bar" class="absolute top-0 bottom-0 left-0 bg-blue-500" style="width: 0%;"></div>
+                            </div>
+                            <!-- Seek Thumb / Scrubber -->
+                            <div id="video-seek-thumb" class="absolute w-3 h-3 rounded-full bg-white border border-blue-500 shadow pointer-events-none -translate-x-1/2 transition-transform duration-75" style="left: 0%;"></div>
+                            <!-- Native Transparent Range Input for reliable scrubbing -->
+                            <input id="video-seek" type="range" min="0" max="1000" value="0" aria-label="Posisi video" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                        </div>
                         <div class="flex items-center gap-2">
                             <button id="video-play-toggle" type="button" aria-label="Putar" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 transition">
                                 <svg id="video-play-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -201,6 +214,12 @@
             player.removeAttribute('src');
             player.load();
             document.getElementById('video-buffering').classList.add('hidden');
+            const bBar = document.getElementById('video-buffer-bar');
+            const pBar = document.getElementById('video-play-bar');
+            const sThumb = document.getElementById('video-seek-thumb');
+            if (bBar) bBar.style.width = '0%';
+            if (pBar) pBar.style.width = '0%';
+            if (sThumb) sThumb.style.left = '0%';
             clearTimeout(controlsHideTimeout);
             showVideoControls();
         }
@@ -286,6 +305,9 @@
 
         const videoSeek = document.getElementById('video-seek');
         const videoTime = document.getElementById('video-time');
+        const videoBufferBar = document.getElementById('video-buffer-bar');
+        const videoPlayBar = document.getElementById('video-play-bar');
+        const videoSeekThumb = document.getElementById('video-seek-thumb');
         const playIcon = '<path d="M8 5v14l11-7z"/>';
         const pauseIcon = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
         let isSeeking = false;
@@ -299,21 +321,47 @@
             return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${remainder}` : `${minutes}:${remainder}`;
         }
 
+        function updateBufferProgress() {
+            const duration = videoPlayerElement.duration;
+            if (!Number.isFinite(duration) || duration <= 0 || !videoPlayerElement.buffered || videoPlayerElement.buffered.length === 0) {
+                if (videoBufferBar) videoBufferBar.style.width = '0%';
+                return;
+            }
+            const current = videoPlayerElement.currentTime || 0;
+            let maxEnd = 0;
+            for (let i = 0; i < videoPlayerElement.buffered.length; i++) {
+                const start = videoPlayerElement.buffered.start(i);
+                const end = videoPlayerElement.buffered.end(i);
+                if (current >= start - 1.5 && current <= end + 1.5) {
+                    maxEnd = Math.max(maxEnd, end);
+                } else if (end > maxEnd && maxEnd === 0) {
+                    maxEnd = end;
+                }
+            }
+            const bufferPercent = Math.min(100, Math.max(0, (maxEnd / duration) * 100));
+            if (videoBufferBar) videoBufferBar.style.width = `${bufferPercent.toFixed(1)}%`;
+        }
+
         function updateVideoControls() {
             const duration = videoPlayerElement.duration;
             const current = videoPlayerElement.currentTime || 0;
             if (!isSeeking) {
                 videoTime.textContent = `${formatPlayerTime(current)} / ${formatPlayerTime(duration)}`;
                 if (Number.isFinite(duration) && duration > 0) {
+                    const playedPercent = Math.min(100, Math.max(0, (current / duration) * 100));
                     videoSeek.value = String(Math.round((current / duration) * 1000));
+                    if (videoPlayBar) videoPlayBar.style.width = `${playedPercent.toFixed(1)}%`;
+                    if (videoSeekThumb) videoSeekThumb.style.left = `${playedPercent.toFixed(1)}%`;
                 }
             }
+            updateBufferProgress();
             const icon = videoPlayerElement.paused ? playIcon : pauseIcon;
             document.getElementById('video-play-icon').innerHTML = icon;
             document.getElementById('video-big-play-icon').innerHTML = icon;
             document.getElementById('video-big-play').classList.toggle('hidden', !videoPlayerElement.paused);
         }
 
+        videoPlayerElement.addEventListener('progress', updateBufferProgress);
         videoPlayerElement.addEventListener('timeupdate', updateVideoControls);
         videoPlayerElement.addEventListener('durationchange', updateVideoControls);
         videoPlayerElement.addEventListener('play', () => {
@@ -340,6 +388,9 @@
             const duration = videoPlayerElement.duration;
             if (Number.isFinite(duration) && duration > 0) {
                 const targetTime = (Number(videoSeek.value) / 1000) * duration;
+                const percent = (Number(videoSeek.value) / 10).toFixed(1);
+                if (videoPlayBar) videoPlayBar.style.width = `${percent}%`;
+                if (videoSeekThumb) videoSeekThumb.style.left = `${percent}%`;
                 videoTime.textContent = `${formatPlayerTime(targetTime)} / ${formatPlayerTime(duration)}`;
             }
         };
