@@ -40,12 +40,27 @@ async def save_local_limits(data):
     except Exception:
         pass
 
+def get_usage_keys(ip: str, device_id: str, today: str):
+    """Use a browser-stable ID for usage; retain IP keys for older clients."""
+    if device_id:
+        return (
+            f"limit_count:device:{device_id}:{today}",
+            f"limit_duration:device:{device_id}:{today}",
+            f"limit_count:{ip}:{today}",
+            f"limit_duration:{ip}:{today}",
+        )
+    return (
+        f"limit_count:{ip}:{today}",
+        f"limit_duration:{ip}:{today}",
+        None,
+        None,
+    )
+
 async def check_limits(ip: str, device_id: str = "", duration_to_add: int = 0, is_info_request: bool = False):
-    """Check daily limits and increment usage if allowed."""
+    """Check daily limits and increment usage, stable across IP changes."""
     today = datetime.now().strftime("%Y-%m-%d")
-    count_key = f"limit_count:{ip}:{today}"
-    duration_key = f"limit_duration:{ip}:{today}"
-    
+    count_key, duration_key, legacy_count_key, legacy_duration_key = get_usage_keys(ip, device_id, today)
+
     is_unlocked = False
     now = int(time.time())
     
@@ -62,6 +77,12 @@ async def check_limits(ip: str, device_id: str = "", duration_to_add: int = 0, i
                 # Active for 3 days (3 * 86400 seconds)
                 if now < claimed_at + 259200:
                     is_unlocked = True
+
+        migration_key = f"usage_migrated:{device_id}:{today}" if device_id else None
+        if legacy_count_key and migration_key not in limits_data:
+            limits_data[count_key] = max(limits_data.get(count_key, 0), limits_data.get(legacy_count_key, 0))
+            limits_data[duration_key] = max(limits_data.get(duration_key, 0), limits_data.get(legacy_duration_key, 0))
+            limits_data[migration_key] = True
 
         current_count = limits_data.get(count_key, 0)
         current_duration = limits_data.get(duration_key, 0)
@@ -511,8 +532,7 @@ async def download(request: Request, id: str, fmt: str, stream: int = 0, device_
 async def get_limits(request: Request, device_id: str = ""):
     ip = get_client_ip(request)
     today = datetime.now().strftime("%Y-%m-%d")
-    count_key = f"limit_count:{ip}:{today}"
-    duration_key = f"limit_duration:{ip}:{today}"
+    count_key, duration_key, legacy_count_key, legacy_duration_key = get_usage_keys(ip, device_id, today)
     
     current_count = 0
     current_duration = 0
@@ -520,7 +540,14 @@ async def get_limits(request: Request, device_id: str = ""):
     now = int(time.time())
 
     # Persistent Local JSON checks
-    limits_data = await load_local_limits()
+    async with limits_lock:
+        limits_data = await load_local_limits()
+        migration_key = f"usage_migrated:{device_id}:{today}" if device_id else None
+        if legacy_count_key and migration_key not in limits_data:
+            limits_data[count_key] = max(limits_data.get(count_key, 0), limits_data.get(legacy_count_key, 0))
+            limits_data[duration_key] = max(limits_data.get(duration_key, 0), limits_data.get(legacy_duration_key, 0))
+            limits_data[migration_key] = True
+            await save_local_limits(limits_data)
     if device_id:
         egg_key = f"easter_egg:{device_id}"
         claim_data = limits_data.get(egg_key)
