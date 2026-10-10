@@ -81,31 +81,12 @@
         </div>
 
         <!-- Empty state: shown while result & error are hidden -->
-        <div id="empty-state" class="flex flex-col items-center gap-4 mt-6 text-center">
-            <div class="w-14 h-14 border-2 border-black rounded-2xl bg-black flex items-center justify-center shadow-[4px_4px_0px_rgba(0,0,0,0.15)]">
-                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
-            </div>
-            <div>
-                <p class="font-extrabold text-black text-base">Paste link atau ketik judul</p>
-                <p class="text-gray-500 text-xs mt-1 font-medium">YouTube · TikTok · dan lainnya</p>
-            </div>
-            <div class="flex flex-col gap-2 w-full mt-1">
-                <div class="flex items-start gap-3 bg-gray-100 border-2 border-black rounded-xl px-4 py-3 text-left shadow-[3px_3px_0px_rgba(0,0,0,1)]">
-                    <span class="text-lg leading-none">⚡</span>
-                    <span class="text-xs font-bold text-black">Paste link YouTube atau TikTok, pilih format, langsung download.</span>
-                </div>
-                <div class="flex items-start gap-3 bg-gray-100 border-2 border-black rounded-xl px-4 py-3 text-left shadow-[3px_3px_0px_rgba(0,0,0,1)]">
-                    <span class="text-lg leading-none">🎵</span>
-                    <span class="text-xs font-bold text-black">Mau audio saja? Pilih format MP3 — diproses langsung, tanpa tunggu lama.</span>
-                </div>
-                <div class="flex items-start gap-3 bg-gray-100 border-2 border-black rounded-xl px-4 py-3 text-left shadow-[3px_3px_0px_rgba(0,0,0,1)]">
-                    <span class="text-lg leading-none">🔍</span>
-                    <span class="text-xs font-bold text-black">Tidak punya link? Ketik judul lagu atau video — hasil pencarian muncul otomatis.</span>
-                </div>
-            </div>
+        <div id="empty-state" class="flex flex-col items-center gap-2 mt-8 text-center">
+            <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            <p class="text-gray-400 text-sm font-bold">Paste link atau ketik judul untuk mulai.</p>
         </div>
 
         <!-- Result Card -->
