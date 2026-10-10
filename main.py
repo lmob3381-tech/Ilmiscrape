@@ -168,11 +168,16 @@ async def proxy_hls(url: str, request: Request):
                     for line in lines:
                         line = line.strip()
                         if line and not line.startswith("#"):
-                            # If it's a relative URL, make it absolute using urljoin
                             abs_url = urllib.parse.urljoin(url, line)
-                            # Rewrite absolute URL to pass through our proxy
-                            encoded = urllib.parse.quote(abs_url)
+                            encoded = urllib.parse.quote(abs_url, safe="")
                             new_lines.append(f"/api/proxy_hls?url={encoded}")
+                        elif line.startswith("#") and "URI=\"" in line:
+                            # Proxy keys/audio playlists in master manifests too.
+                            def rewrite_uri(match):
+                                abs_url = urllib.parse.urljoin(url, match.group(1))
+                                encoded = urllib.parse.quote(abs_url, safe="")
+                                return f'URI="/api/proxy_hls?url={encoded}"'
+                            new_lines.append(re.sub(r'URI="([^"]+)"', rewrite_uri, line))
                         else:
                             new_lines.append(line)
                     yield "\n".join(new_lines).encode("utf-8")
@@ -186,7 +191,8 @@ async def proxy_hls(url: str, request: Request):
     # To be fully compliant with Range requests on TS chunks:
     # However, hls.js usually requests full chunks, not byte ranges, unless it's a single file MP4.
     media_type = "application/vnd.apple.mpegurl" if ".m3u8" in url else "video/MP2T"
-    return StreamingResponse(fetch_hls(), media_type=media_type)
+    headers = {"Cache-Control": "no-store"}
+    return StreamingResponse(fetch_hls(), media_type=media_type, headers=headers)
 
 @app.get("/api/thumb")
 async def proxy_thumb(url: str):

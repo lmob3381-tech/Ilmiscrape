@@ -159,11 +159,23 @@
         const result = document.getElementById('result');
         const submitBtn = document.getElementById('submit-btn');
 
+        function stopCurrentVideoStream() {
+            const player = document.getElementById('video-player');
+            player.pause();
+            if (window.hlsInstance) {
+                window.hlsInstance.destroy();
+                window.hlsInstance = null;
+            }
+            player.removeAttribute('src');
+            player.load();
+        }
+
         function checkScrollState() {
             const isResultHidden = result.classList.contains('hidden');
             const isErrorHidden = errorDiv.classList.contains('hidden');
+            const isLoading = !loading.classList.contains('hidden');
             const emptyState = document.getElementById('empty-state');
-            if (isResultHidden && isErrorHidden) {
+            if (isResultHidden && isErrorHidden && !isLoading) {
                 document.body.classList.add('overflow-hidden');
                 emptyState.classList.remove('hidden');
             } else {
@@ -308,8 +320,10 @@
                             // Call processUrl directly instead of relying on submit event
                             // This bypasses any weird form event blocking by the browser
                             result.classList.add('hidden');
+                            stopCurrentVideoStream();
                             errorDiv.classList.add('hidden');
                             loading.classList.remove('hidden'); loading.classList.add('flex');
+                            checkScrollState();
                             submitBtn.disabled = true;
                             submitBtn.classList.add('opacity-50');
 
@@ -364,6 +378,7 @@
 
             // Reset UI
             result.classList.add('hidden');
+            stopCurrentVideoStream();
             document.getElementById('search-results').classList.add('hidden');
             errorDiv.classList.add('hidden');
             loading.classList.remove('hidden'); loading.classList.add('flex');
@@ -425,8 +440,10 @@
                     searchResultsContainer.classList.add('hidden');
 
                     result.classList.add('hidden');
+                    stopCurrentVideoStream();
                     errorDiv.classList.add('hidden');
                     loading.classList.remove('hidden'); loading.classList.add('flex');
+                    checkScrollState();
                     submitBtn.disabled = true;
                     submitBtn.classList.add('opacity-50');
 
