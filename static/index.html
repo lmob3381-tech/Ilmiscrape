@@ -143,7 +143,7 @@
                             <span id="video-buffering-text" class="text-xs font-bold">Buffering...</span>
                         </div>
                     </div>
-                    <div class="bg-black px-3 pt-2 pb-3 text-white">
+                    <div class="bg-black px-3 pt-2 pb-1.5 text-white">
                         <input id="video-seek" type="range" min="0" max="1000" value="0" aria-label="Posisi video" class="w-full h-1.5 cursor-pointer accent-blue-500">
                         <div class="flex items-center gap-3 mt-1">
                             <button id="video-play-toggle" type="button" aria-label="Putar" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/15 active:scale-95 transition">
@@ -677,15 +677,16 @@
                 if (hlsFormat && Hls.isSupported()) {
                     // Adaptive quality stays enabled; prefetch the opening fragment for faster playback.
                     const hls = new Hls({
-                        startLevel: -1,
-                        capLevelToPlayerSize: false,
+                        startLevel: 0,          // mulai dari kualitas terendah dulu, cepat muat
+                        autoStartLoad: true,
                         startFragPrefetch: true,
-                        maxBufferLength: 10,
-                        maxMaxBufferLength: 20,
-                        backBufferLength: 15,
-                        maxBufferSize: 60 * 1000 * 1000,
-                        highBufferWatchdogPeriod: 2,
-                        nudgeMaxRetry: 5
+                        maxBufferLength: 4,     // cukup 4 detik untuk mulai putar
+                        maxMaxBufferLength: 12,
+                        backBufferLength: 5,
+                        maxBufferSize: 20 * 1000 * 1000,
+                        fragLoadingTimeOut: 20000,
+                        manifestLoadingTimeOut: 20000,
+                        nudgeMaxRetry: 8
                     });
                     window.hlsInstance = hls;
                     hls.attachMedia(videoPlayer);

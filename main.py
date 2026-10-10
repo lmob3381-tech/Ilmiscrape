@@ -182,8 +182,8 @@ async def proxy_hls(url: str, request: Request):
                             new_lines.append(line)
                     yield "\n".join(new_lines).encode("utf-8")
                 else:
-                    # Stream .ts or other segments
-                    async for chunk in res.aiter_bytes(64 * 1024):
+                    # Stream .ts or other segments dengan chunk kecil supaya byte pertama cepat
+                    async for chunk in res.aiter_bytes(8 * 1024):
                         yield chunk
 
     # For TS files, we must respect status code and headers if possible, 
