@@ -127,7 +127,10 @@ async def proxy_hls(url: str, request: Request):
         
     async def fetch_hls():
         async with httpx.AsyncClient(proxy=proxy, follow_redirects=True, timeout=15.0) as client:
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+                "Referer": "https://www.pornhub.com/" if "phncdn.com" in url else "https://www.xnxx.com/"
+            }
             
             # Forward Range header for .ts chunks if present
             range_header = request.headers.get("Range")
@@ -171,10 +174,16 @@ async def proxy_thumb(url: str):
     
     # We can use the same proxy settings as yt-dlp
     proxy = "socks5://127.0.0.1:40000"
-    
+    if "xnxx-cdn.com" in url or "tikwm.com" in url or "phncdn.com" in url:
+        proxy = None
+        
     async def fetch_thumb():
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+            "Referer": "https://www.pornhub.com/" if "phncdn.com" in url else "https://www.xnxx.com/"
+        }
         async with httpx.AsyncClient(proxy=proxy, follow_redirects=True, timeout=10.0) as client:
-            async with client.stream("GET", url) as res:
+            async with client.stream("GET", url, headers=headers) as res:
                 if res.status_code != 200:
                     yield b""
                     return

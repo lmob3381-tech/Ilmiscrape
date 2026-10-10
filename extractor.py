@@ -67,6 +67,84 @@ def search_xnxx(query, limit=20):
             
     return videos
 
+def search_pornhub(query, limit=20):
+    try:
+        from curl_cffi import requests as c_requests
+    except ImportError:
+        print("[PornHub] curl_cffi not installed")
+        return []
+
+    page = 1
+    if query.startswith("$$"):
+        page_str = query.replace("$$", "").strip()
+        page = int(page_str) if page_str.isdigit() else 1
+        url = f"https://www.pornhub.com/video?page={page}"
+    elif query.startswith("$"):
+        q = query[1:].strip().replace(" ", "+")
+        url = f"https://www.pornhub.com/video/search?search={q}&page=1"
+    else:
+        return []
+        
+    try:
+        res = c_requests.get(url, impersonate="chrome110", timeout=10)
+        html = res.text
+    except Exception as e:
+        print(f"[PornHub] Search error: {e}")
+        return []
+
+    import re
+    videos = []
+    blocks = re.findall(r'<li[^>]*class="[^"]*pcVideoListItem[^"]*"[^>]*>(.*?)</li>', html, re.DOTALL)
+    for b in blocks:
+        t_match = re.search(r'title="([^"]+)"', b)
+        title = t_match.group(1) if t_match else "Unknown"
+        
+        l_match = re.search(r'href="(/view_video\.php\?viewkey=[^"]+)"', b)
+        if not l_match:
+            continue
+        link = "https://www.pornhub.com" + l_match.group(1)
+        vid_id = l_match.group(1).split("viewkey=")[-1]
+        
+        th_match = re.search(r'data-mediumthumb="([^"]+)"', b) or re.search(r'src="([^"]+)"', b)
+        thumb = th_match.group(1) if th_match else ""
+        if "blank" in thumb or not thumb.startswith("http"):
+             th_match = re.search(r'data-image="([^"]+)"', b) or re.search(r'data-src="([^"]+)"', b)
+             if th_match:
+                 thumb = th_match.group(1)
+                 
+        if thumb and "phncdn.com" in thumb:
+            import urllib.parse
+            thumb = "/api/thumb?url=" + urllib.parse.quote(thumb)
+
+        d_match = re.search(r'<var class="duration">([^<]+)</var>', b)
+        duration_text = d_match.group(1).strip() if d_match else "0"
+        
+        seconds = 0
+        parts = duration_text.split(":")
+        if len(parts) == 3:
+            seconds = int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+        elif len(parts) == 2:
+            seconds = int(parts[0])*60 + int(parts[1])
+            
+        u_match = re.search(r'class="usernameWrap".*?>([^<]+)</a>', b, re.DOTALL)
+        if not u_match:
+            u_match = re.search(r'data-mxptext="([^"]+)"', b)
+        uploader = u_match.group(1).strip() if u_match else "Unknown"
+        
+        videos.append({
+            "title": title,
+            "uploader": uploader,
+            "duration": seconds,
+            "thumbnail": thumb,
+            "url": link,
+            "id": vid_id,
+            "platform": "pornhub"
+        })
+        if len(videos) >= limit:
+            break
+            
+    return videos
+
 # YouTube memblokir IP datacenter ini ("Sign in to confirm you're not a bot").
 # Semua request yt-dlp (metadata & pencarian) dirutekan lewat proxy — default
 # Cloudflare WARP lokal di :40000. Set YTDLP_PROXY="" untuk mematikan.
@@ -101,6 +179,8 @@ def _extract(url: str, opts: dict):
         raise
 
 def search_youtube(query: str, limit: int = 5):
+    if query.strip().startswith("$$") or query.strip().startswith("$"):
+        return search_pornhub(query, limit=10)
     if query.strip().startswith("#"):
         return search_xnxx(query, limit=10)
         
@@ -213,6 +293,8 @@ def extract_info(url: str) -> Dict[str, Any]:
         platform = "tiktok"
     elif "xnxx" in extractor:
         platform = "xnxx"
+    elif "pornhub" in extractor:
+        platform = "pornhub"
     else:
         platform = "other"
 
@@ -287,7 +369,7 @@ def extract_info(url: str) -> Dict[str, Any]:
                 "duration": duration
             })
 
-    elif platform == "xnxx":
+    elif platform == "xnxx" or platform == "pornhub":
         best_video = next((f for f in reversed(info.get("formats", [])) if "hls" in f.get("format_id", "").lower() or f.get("protocol") == "m3u8_native"), None)
         if not best_video:
             best_video = next((f for f in reversed(info.get("formats", [])) if f.get("protocol") == "https" and f.get("ext") == "mp4"), None)
@@ -298,8 +380,12 @@ def extract_info(url: str) -> Dict[str, Any]:
             size = best_video.get("filesize") or best_video.get("filesize_approx")
             if not is_hls and not size:
                 try:
-                    with httpx.Client(timeout=5.0) as client:
-                        head_res = client.get(url, headers={"Range": "bytes=0-0"})
+                    with httpx.Client(timeout=5.0, proxy="socks5://127.0.0.1:40000" if platform == "pornhub" else None) as client:
+                        head_res = client.get(url, headers={
+                            "Range": "bytes=0-0",
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                            "Referer": "https://www.pornhub.com/" if platform == "pornhub" else "https://www.xnxx.com/"
+                        })
                         if head_res.status_code in (206, 200):
                             cr = head_res.headers.get("content-range")
                             if cr:
@@ -332,7 +418,7 @@ def extract_info(url: str) -> Dict[str, Any]:
                 "headers": info.get("http_headers", {})
             })
 
-    if platform == "xnxx" and thumbnail and "xnxx-cdn.com" in thumbnail:
+    if (platform == "xnxx" and thumbnail and "xnxx-cdn.com" in thumbnail) or (platform == "pornhub" and thumbnail and "phncdn.com" in thumbnail):
         import urllib.parse
         thumbnail = "/api/thumb?url=" + urllib.parse.quote(thumbnail)
 

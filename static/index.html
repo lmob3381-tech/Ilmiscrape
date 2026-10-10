@@ -208,6 +208,10 @@
                 searchResultsContainer.classList.add('hidden');
                 return;
             }
+            if (val.startsWith('$') && !val.startsWith('$$') && val.replace(/^\$\s*/, '').length === 0) {
+                searchResultsContainer.classList.add('hidden');
+                return;
+            }
 
             // Set small loading state in dropdown
             searchResultsContainer.classList.remove('hidden');
@@ -454,7 +458,7 @@
             const hasMp3 = data.formats.some(f => f.key === 'mp3');
             
             let hlsInstance = null;
-            if (data.platform === 'xnxx') {
+            if (data.platform === 'xnxx' || data.platform === 'pornhub') {
                 // Sembunyikan daftar format dan stream audio
                 formatListContainer.classList.add('hidden');
                 audioStream.classList.add('hidden');
