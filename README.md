@@ -74,4 +74,7 @@ Anda dapat memaksimalkan fitur *Search Bar* di tampilan antarmuka dengan *prefix
 - 🎨 `static/index.html` - Frontend modern, ringan (0-bundle), ditenagai CDN Tailwind dan HLS.js.
 
 ---
-*Dibangun dengan ❤️ oleh [IlmiDev]*
+
+<div align="center">
+  <p><b>&copy; 2026 IlmiDev.</b> All rights reserved.</p>
+</div>
