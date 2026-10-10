@@ -16,11 +16,10 @@
 
 ## ✨ Fitur Utama
 
-- 🌐 **Multi-Platform Support**: YouTube, TikTok (tanpa watermark), dan platform tambahan lainnya secara langsung.
-- ⚡ **Instant Stream (On-the-fly)**: Konversi format (seperti MP3 320kbps atau Video HLS) dikerjakan <i>streaming langsung</i> dari memori / pipa, sehingga tidak membebani <i>disk space</i> server.
+- 🌐 **Multi-Platform Support**: YouTube dan TikTok (tanpa watermark).
+- ⚡ **Instant Stream (On-the-fly)**: Konversi format (seperti MP3 320kbps) dikerjakan <i>streaming langsung</i> dari memori / pipa, sehingga tidak membebani <i>disk space</i> server.
 - 🔍 **Realtime Auto-Search**: Ketik judul apa saja dan hasil pencarian otomatis muncul dengan *thumbnail* instan.
-- 🚀 **Anti-Bot Bypass Engine**: Terintegrasi `curl_cffi` + `yt-dlp` + *Local Proxy Tunneling* (WARP-ready) untuk membypass pemblokiran IP seperti Cloudflare secara senyap.
-- 📺 **Native HLS/HD Player**: Streaming langsung video format `.m3u8` berkualitas HD dengan <i>built-in player</i> yang ditenagai oleh HLS.js.
+- 🚀 **Anti-Bot Bypass Engine**: Terintegrasi `curl_cffi` + `yt-dlp` + *Local Proxy Tunneling* (WARP-ready) untuk membypass pemblokiran IP.
 - 🎨 **Neo-Brutalist UI**: Desain antarmuka *mobile-first* satu halaman (SPA) elegan dengan sentuhan hitam pekat *OLED-Dark Mode*, bebas animasi yang tidak perlu.
 - 🧠 **Smart Caching**: Respon 10x lebih cepat dengan memori Redis (*fallback* ke memori lokal jika tidak tersedia).
 
@@ -65,9 +64,6 @@ Anda dapat memaksimalkan fitur *Search Bar* di tampilan antarmuka dengan *prefix
 | :--- | :--- | :--- |
 | `[Teks Biasa]` | `lagu terbaru` | Melakukan **pencarian di YouTube**. Otomatis menampilkan opsi MP3/MP4 dan fitur pemutar Audio. |
 | `[Link Langsung]` | `https://tiktok.com/...` | Otomatis melewati *search* dan akan **mengekstraksi info URL tersebut secara langsung**. |
-| `# [Kata Kunci]` | `#indonesia` | Melakukan pencarian dari **Platform Ekstra (1)**. Video yang diklik akan langsung di-*stream* via native HTML5 Video Player tanpa format unduhan. |
-| `$ [Kata Kunci]` | `$asian` | Melakukan pencarian dari **Platform Ekstra (2)**. Menggunakan bypass Cloudflare agar *thumbnail* dan video HLS (HD) berjalan mulus. |
-| `$$ [Angka]` | `$$1` atau `$$2` | Mengambil daftar video yang ada di **Halaman Utama / Homepage (Page 1, 2, dst)** dari Platform Ekstra (2). |
 
 ---
 
