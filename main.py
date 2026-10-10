@@ -115,6 +115,11 @@ from extractor import extract_info, search_youtube
 app = FastAPI(title="IlmiDev Downloader API")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Persistent connection pool for high-speed HLS proxying
+hls_limits = httpx.Limits(max_keepalive_connections=30, max_connections=60, keepalive_expiry=120.0)
+hls_client_direct = httpx.AsyncClient(limits=hls_limits, follow_redirects=True, timeout=20.0)
+hls_client_proxy = httpx.AsyncClient(proxy="socks5://127.0.0.1:40000", limits=hls_limits, follow_redirects=True, timeout=20.0)
+
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 try:
     cache = redis_async.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
@@ -142,57 +147,50 @@ async def proxy_hls(url: str, request: Request):
     if not url.startswith("http"):
         raise HTTPException(status_code=400, detail="Invalid URL")
     
-    proxy = None
-    if "xnxx-cdn.com" not in url:
-        proxy = "socks5://127.0.0.1:40000"
+    client = hls_client_direct if "xnxx-cdn.com" in url else hls_client_proxy
         
     async def fetch_hls():
-        async with httpx.AsyncClient(proxy=proxy, follow_redirects=True, timeout=15.0) as client:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
-                "Referer": "https://www.pornhub.com/" if "phncdn.com" in url else "https://www.xnxx.com/"
-            }
-            
-            # Forward Range header for .ts chunks if present
-            range_header = request.headers.get("Range")
-            if range_header:
-                headers["Range"] = range_header
-                
-            async with client.stream("GET", url, headers=headers) as res:
-                if ".m3u8" in url:
-                    # Rewrite m3u8 contents
-                    content = await res.aread()
-                    text = content.decode("utf-8")
-                    lines = text.split("\n")
-                    new_lines = []
-                    for line in lines:
-                        line = line.strip()
-                        if line and not line.startswith("#"):
-                            abs_url = urllib.parse.urljoin(url, line)
-                            encoded = urllib.parse.quote(abs_url, safe="")
-                            new_lines.append(f"/api/proxy_hls?url={encoded}")
-                        elif line.startswith("#") and "URI=\"" in line:
-                            # Proxy keys/audio playlists in master manifests too.
-                            def rewrite_uri(match):
-                                abs_url = urllib.parse.urljoin(url, match.group(1))
-                                encoded = urllib.parse.quote(abs_url, safe="")
-                                return f'URI="/api/proxy_hls?url={encoded}"'
-                            new_lines.append(re.sub(r'URI="([^"]+)"', rewrite_uri, line))
-                        else:
-                            new_lines.append(line)
-                    yield "\n".join(new_lines).encode("utf-8")
-                else:
-                    # Stream .ts or other segments dengan chunk kecil supaya byte pertama cepat
-                    async for chunk in res.aiter_bytes(64 * 1024):
-                        yield chunk
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+            "Referer": "https://www.pornhub.com/" if "phncdn.com" in url else "https://www.xnxx.com/"
+        }
 
-    # For TS files, we must respect status code and headers if possible, 
-    # but StreamingResponse with 200/206 is usually handled okay by hls.js.
-    # To be fully compliant with Range requests on TS chunks:
-    # However, hls.js usually requests full chunks, not byte ranges, unless it's a single file MP4.
+        # Forward Range header for .ts chunks if present
+        range_header = request.headers.get("Range")
+        if range_header:
+            headers["Range"] = range_header
+
+        async with client.stream("GET", url, headers=headers) as res:
+            if ".m3u8" in url:
+                # Rewrite m3u8 contents
+                content = await res.aread()
+                text = content.decode("utf-8")
+                lines = text.split("\n")
+                new_lines = []
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        abs_url = urllib.parse.urljoin(url, line)
+                        encoded = urllib.parse.quote(abs_url, safe="")
+                        new_lines.append(f"/api/proxy_hls?url={encoded}")
+                    elif line.startswith("#") and "URI=\"" in line:
+                        # Proxy keys/audio playlists in master manifests too.
+                        def rewrite_uri(match):
+                            abs_url = urllib.parse.urljoin(url, match.group(1))
+                            encoded = urllib.parse.quote(abs_url, safe="")
+                            return f'URI="/api/proxy_hls?url={encoded}"'
+                        new_lines.append(re.sub(r'URI="([^"]+)"', rewrite_uri, line))
+                    else:
+                        new_lines.append(line)
+                yield "\n".join(new_lines).encode("utf-8")
+            else:
+                # Stream .ts or other segments directly
+                async for chunk in res.aiter_bytes(64 * 1024):
+                    yield chunk
+
     media_type = "application/vnd.apple.mpegurl" if ".m3u8" in url else "video/MP2T"
-    headers = {"Cache-Control": "no-store"}
-    return StreamingResponse(fetch_hls(), media_type=media_type, headers=headers)
+    cache_header = "no-cache, no-store" if ".m3u8" in url else "public, max-age=86400"
+    return StreamingResponse(fetch_hls(), media_type=media_type, headers={"Cache-Control": cache_header})
 
 @app.get("/api/thumb")
 async def proxy_thumb(url: str):

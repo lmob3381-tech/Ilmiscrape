@@ -767,15 +767,16 @@
                 const mp4Format = data.formats.find(f => f.key === 'mp4');
                 
                 if (hlsFormat && Hls.isSupported()) {
-                    // Adaptive quality stays enabled; prefetch the opening fragment for faster playback.
+                    // Optimized HLS buffer: 30s lookahead, progressive demux, fast prefetch
                     const hls = new Hls({
                         startLevel: -1,
                         capLevelToPlayerSize: false,
                         startFragPrefetch: true,
-                        maxBufferLength: 10,
-                        maxMaxBufferLength: 20,
-                        backBufferLength: 15,
+                        maxBufferLength: 30,
+                        maxMaxBufferLength: 60,
+                        backBufferLength: 30,
                         maxBufferSize: 60 * 1000 * 1000,
+                        progressive: true,
                         highBufferWatchdogPeriod: 2,
                         nudgeMaxRetry: 5
                     });
