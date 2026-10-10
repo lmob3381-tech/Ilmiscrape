@@ -53,9 +53,14 @@ def search_xnxx(query, limit=20):
         if m: seconds += int(m.group(1)) * 60
         if s: seconds += int(s.group(1))
         
+        u_match = re.search(r'class="uploader"[^>]*>.*?<span class="name">([^<]+)</span>', part, re.DOTALL)
+        if not u_match:
+            u_match = re.search(r'<a\s+[^>]*href="/(?:porn-maker|profile|channel|model|uploader|pornstar|profiles|channels)/[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)(?:</span>)?</a>', part, re.I)
+        uploader = u_match.group(1).strip() if u_match else "XNXX"
+
         videos.append({
             "title": title,
-            "uploader": "XNXX",
+            "uploader": uploader,
             "duration": seconds,
             "thumbnail": thumb,
             "url": url,
@@ -301,7 +306,33 @@ def extract_info(url: str) -> Dict[str, Any]:
     title = info.get("title", "Unknown Title")
     duration = info.get("duration", 0)
     thumbnail = info.get("thumbnail", "")
-    uploader = info.get("uploader", "Unknown Uploader")
+    uploader = info.get("uploader") or info.get("creator") or info.get("channel") or "Unknown Uploader"
+
+    if platform in ("xnxx", "pornhub") and (not uploader or uploader.lower() in ("unknown uploader", "unknown", "xnxx", "pornhub")):
+        try:
+            with httpx.Client(timeout=5.0, proxy="socks5://127.0.0.1:40000" if platform == "pornhub" else None) as client:
+                page_res = client.get(url, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://www.pornhub.com/" if platform == "pornhub" else "https://www.xnxx.com/"
+                }, follow_redirects=True)
+                if page_res.status_code == 200:
+                    page_html = page_res.text
+                    if platform == "xnxx":
+                        m_up = re.search(r'<a\s+[^>]*href="/(?:porn-maker|profile|channel|model|uploader|pornstar|profiles|channels)/[^"]*"[^>]*>([^<]+)</a>', page_html, re.I)
+                        if not m_up:
+                            m_up = re.search(r'class="uploader"[^>]*>.*?<span class="name">([^<]+)</span>', page_html, re.DOTALL)
+                        if m_up:
+                            uploader = m_up.group(1).strip()
+                    elif platform == "pornhub":
+                        m_up = re.search(r'class="usernameBadgesWrapper"[^>]*>.*?<a[^>]+href="[^"]*"[^>]*>([^<]+)</a>', page_html, re.DOTALL)
+                        if not m_up:
+                            m_up = re.search(r'<span class="usernameWrap"[^>]*>.*?<a[^>]*>([^<]+)</a>', page_html, re.DOTALL)
+                        if not m_up:
+                            m_up = re.search(r'class="bolded">([^<]+)</a>', page_html)
+                        if m_up:
+                            uploader = m_up.group(1).strip()
+        except Exception:
+            pass
 
     formats = []
 
