@@ -677,16 +677,15 @@
                 if (hlsFormat && Hls.isSupported()) {
                     // Adaptive quality stays enabled; prefetch the opening fragment for faster playback.
                     const hls = new Hls({
-                        startLevel: 0,          // mulai dari kualitas terendah dulu, cepat muat
-                        autoStartLoad: true,
+                        startLevel: -1,
+                        capLevelToPlayerSize: false,
                         startFragPrefetch: true,
-                        maxBufferLength: 4,     // cukup 4 detik untuk mulai putar
-                        maxMaxBufferLength: 12,
-                        backBufferLength: 5,
-                        maxBufferSize: 20 * 1000 * 1000,
-                        fragLoadingTimeOut: 20000,
-                        manifestLoadingTimeOut: 20000,
-                        nudgeMaxRetry: 8
+                        maxBufferLength: 10,
+                        maxMaxBufferLength: 20,
+                        backBufferLength: 15,
+                        maxBufferSize: 60 * 1000 * 1000,
+                        highBufferWatchdogPeriod: 2,
+                        nudgeMaxRetry: 5
                     });
                     window.hlsInstance = hls;
                     hls.attachMedia(videoPlayer);
