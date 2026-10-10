@@ -812,20 +812,23 @@
                 const mp4Format = data.formats.find(f => f.key === 'mp4');
                 
                 if (hlsFormat && Hls.isSupported()) {
-                    // Optimized HLS: 30s lookahead, worker demuxing, fast seek nudging
+                    // Optimized HLS: Fast play/seek start + Deep ongoing background buffer (60-120s)
                     const hls = new Hls({
                         startLevel: -1,
                         capLevelToPlayerSize: false,
                         startFragPrefetch: true,
-                        maxBufferLength: 30,
-                        maxMaxBufferLength: 60,
-                        backBufferLength: 30,
-                        maxBufferSize: 60 * 1000 * 1000,
+                        maxBufferLength: 60,
+                        maxMaxBufferLength: 120,
+                        backBufferLength: 60,
+                        maxBufferSize: 150 * 1000 * 1000,
+                        abrEwmaDefaultEstimate: 15000000,
                         enableWorker: true,
-                        fragLoadingTimeOut: 15000,
-                        manifestLoadingTimeOut: 15000,
+                        fragLoadingTimeOut: 20000,
+                        manifestLoadingTimeOut: 20000,
+                        fragLoadingMaxRetry: 6,
+                        fragLoadingRetryDelay: 500,
                         highBufferWatchdogPeriod: 2,
-                        nudgeMaxRetry: 8,
+                        nudgeMaxRetry: 10,
                         nudgeOffset: 0.1
                     });
                     window.hlsInstance = hls;

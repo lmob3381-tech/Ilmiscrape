@@ -116,9 +116,9 @@ app = FastAPI(title="IlmiDev Downloader API")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Persistent connection pool for high-speed HLS proxying
-hls_limits = httpx.Limits(max_keepalive_connections=30, max_connections=60, keepalive_expiry=120.0)
-hls_client_direct = httpx.AsyncClient(limits=hls_limits, follow_redirects=True, timeout=20.0)
-hls_client_proxy = httpx.AsyncClient(proxy="socks5://127.0.0.1:40000", limits=hls_limits, follow_redirects=True, timeout=20.0)
+hls_limits = httpx.Limits(max_keepalive_connections=50, max_connections=100, keepalive_expiry=180.0)
+hls_client_direct = httpx.AsyncClient(limits=hls_limits, follow_redirects=True, timeout=25.0)
+hls_client_proxy = httpx.AsyncClient(proxy="socks5://127.0.0.1:40000", limits=hls_limits, follow_redirects=True, timeout=25.0)
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 try:
