@@ -533,12 +533,18 @@
 
             formatListContainer.classList.remove('hidden');
             videoStream.classList.add('hidden');
+
+            // Stop and detach any previous stream before loading a new result.
+            videoPlayer.pause();
+            if (window.hlsInstance) {
+                window.hlsInstance.destroy();
+                window.hlsInstance = null;
+            }
             videoPlayer.removeAttribute('src');
             videoPlayer.load();
 
             const hasMp3 = data.formats.some(f => f.key === 'mp3');
             
-            let hlsInstance = null;
             if (data.platform === 'xnxx' || data.platform === 'pornhub') {
                 // Sembunyikan daftar format dan stream audio
                 formatListContainer.classList.add('hidden');
@@ -546,14 +552,12 @@
                 
                 // Tampilkan video player
                 videoStream.classList.remove('hidden');
-                videoPlayer.removeAttribute('src');
                 videoPlayer.poster = data.thumbnail || '';
                 
                 const hlsFormat = data.formats.find(f => f.key === 'hls');
                 const mp4Format = data.formats.find(f => f.key === 'mp4');
                 
                 if (hlsFormat && Hls.isSupported()) {
-                    if (window.hlsInstance) window.hlsInstance.destroy();
                     window.hlsInstance = new Hls();
                     window.hlsInstance.loadSource(`/api/proxy_hls?url=${encodeURIComponent(hlsFormat.url)}`);
                     window.hlsInstance.attachMedia(videoPlayer);
