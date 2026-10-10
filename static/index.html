@@ -288,6 +288,8 @@
         const videoTime = document.getElementById('video-time');
         const playIcon = '<path d="M8 5v14l11-7z"/>';
         const pauseIcon = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
+        let isSeeking = false;
+
         function formatPlayerTime(value) {
             if (!Number.isFinite(value)) return '0:00';
             const seconds = Math.floor(value);
@@ -296,18 +298,22 @@
             const remainder = String(seconds % 60).padStart(2, '0');
             return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${remainder}` : `${minutes}:${remainder}`;
         }
+
         function updateVideoControls() {
             const duration = videoPlayerElement.duration;
             const current = videoPlayerElement.currentTime || 0;
-            videoTime.textContent = `${formatPlayerTime(current)} / ${formatPlayerTime(duration)}`;
-            if (Number.isFinite(duration) && duration > 0 && !videoSeek.matches(':active')) {
-                videoSeek.value = String(Math.round((current / duration) * 1000));
+            if (!isSeeking) {
+                videoTime.textContent = `${formatPlayerTime(current)} / ${formatPlayerTime(duration)}`;
+                if (Number.isFinite(duration) && duration > 0) {
+                    videoSeek.value = String(Math.round((current / duration) * 1000));
+                }
             }
             const icon = videoPlayerElement.paused ? playIcon : pauseIcon;
             document.getElementById('video-play-icon').innerHTML = icon;
             document.getElementById('video-big-play-icon').innerHTML = icon;
             document.getElementById('video-big-play').classList.toggle('hidden', !videoPlayerElement.paused);
         }
+
         videoPlayerElement.addEventListener('timeupdate', updateVideoControls);
         videoPlayerElement.addEventListener('durationchange', updateVideoControls);
         videoPlayerElement.addEventListener('play', () => {
@@ -322,13 +328,41 @@
             updateVideoControls();
             showVideoControls();
         });
-        videoSeek.addEventListener('input', () => {
+
+        const onSeekStart = () => {
+            isSeeking = true;
+            resetControlsHideTimer();
+        };
+
+        const onSeekInput = () => {
+            isSeeking = true;
             resetControlsHideTimer();
             const duration = videoPlayerElement.duration;
             if (Number.isFinite(duration) && duration > 0) {
-                videoPlayerElement.currentTime = (Number(videoSeek.value) / 1000) * duration;
+                const targetTime = (Number(videoSeek.value) / 1000) * duration;
+                videoTime.textContent = `${formatPlayerTime(targetTime)} / ${formatPlayerTime(duration)}`;
             }
-        });
+        };
+
+        const onSeekEnd = () => {
+            if (!isSeeking) return;
+            isSeeking = false;
+            resetControlsHideTimer();
+            const duration = videoPlayerElement.duration;
+            if (Number.isFinite(duration) && duration > 0) {
+                const targetTime = (Number(videoSeek.value) / 1000) * duration;
+                videoPlayerElement.currentTime = targetTime;
+            }
+        };
+
+        videoSeek.addEventListener('pointerdown', onSeekStart);
+        videoSeek.addEventListener('touchstart', onSeekStart, { passive: true });
+        videoSeek.addEventListener('mousedown', onSeekStart);
+        videoSeek.addEventListener('input', onSeekInput);
+        videoSeek.addEventListener('change', onSeekEnd);
+        videoSeek.addEventListener('pointerup', onSeekEnd);
+        videoSeek.addEventListener('touchend', onSeekEnd);
+        videoSeek.addEventListener('mouseup', onSeekEnd);
         const toggleVideoPlayback = () => {
             if (videoPlayerElement.paused) videoPlayerElement.play().catch(() => {});
             else videoPlayerElement.pause();
@@ -767,7 +801,7 @@
                 const mp4Format = data.formats.find(f => f.key === 'mp4');
                 
                 if (hlsFormat && Hls.isSupported()) {
-                    // Optimized HLS buffer: 30s lookahead, progressive demux, fast prefetch
+                    // Optimized HLS buffer: 30s lookahead, progressive demux, fast prefetch, web worker
                     const hls = new Hls({
                         startLevel: -1,
                         capLevelToPlayerSize: false,
@@ -777,6 +811,9 @@
                         backBufferLength: 30,
                         maxBufferSize: 60 * 1000 * 1000,
                         progressive: true,
+                        enableWorker: true,
+                        fragLoadingTimeOut: 15000,
+                        manifestLoadingTimeOut: 15000,
                         highBufferWatchdogPeriod: 2,
                         nudgeMaxRetry: 5
                     });
