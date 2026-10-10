@@ -411,7 +411,8 @@ def extract_info(url: str) -> Dict[str, Any]:
             size = best_video.get("filesize") or best_video.get("filesize_approx")
             if not is_hls and not size:
                 try:
-                    with httpx.Client(timeout=5.0, proxy="socks5://127.0.0.1:40000" if platform == "pornhub" else None) as client:
+                    proxy_url = "socks5://127.0.0.1:40000" if (platform == "pornhub" and "phncdn.com" not in url) else None
+                    with httpx.Client(timeout=8.0, proxy=proxy_url) as client:
                         head_res = client.get(url, headers={
                             "Range": "bytes=0-0",
                             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

@@ -323,23 +323,32 @@
 
         function updateBufferProgress() {
             const duration = videoPlayerElement.duration;
-            if (!Number.isFinite(duration) || duration <= 0 || !videoPlayerElement.buffered || videoPlayerElement.buffered.length === 0) {
+            if (!Number.isFinite(duration) || duration <= 0) {
                 if (videoBufferBar) videoBufferBar.style.width = '0%';
                 return;
             }
+            if (!videoPlayerElement.buffered || videoPlayerElement.buffered.length === 0) {
+                return;
+            }
             const current = videoPlayerElement.currentTime || 0;
-            let maxEnd = 0;
+            let currentEnd = 0;
             for (let i = 0; i < videoPlayerElement.buffered.length; i++) {
                 const start = videoPlayerElement.buffered.start(i);
                 const end = videoPlayerElement.buffered.end(i);
-                if (current >= start - 1.5 && current <= end + 1.5) {
-                    maxEnd = Math.max(maxEnd, end);
-                } else if (end > maxEnd && maxEnd === 0) {
-                    maxEnd = end;
+                if (current >= start - 2.0 && current <= end + 2.0) {
+                    currentEnd = Math.max(currentEnd, end);
                 }
             }
-            const bufferPercent = Math.min(100, Math.max(0, (maxEnd / duration) * 100));
-            if (videoBufferBar) videoBufferBar.style.width = `${bufferPercent.toFixed(1)}%`;
+            if (currentEnd === 0 && videoPlayerElement.buffered.length > 0) {
+                for (let i = 0; i < videoPlayerElement.buffered.length; i++) {
+                    const end = videoPlayerElement.buffered.end(i);
+                    currentEnd = Math.max(currentEnd, end);
+                }
+            }
+            if (currentEnd > 0) {
+                const bufferPercent = Math.min(100, Math.max(0, (currentEnd / duration) * 100));
+                if (videoBufferBar) videoBufferBar.style.width = `${bufferPercent.toFixed(1)}%`;
+            }
         }
 
         function updateVideoControls() {
@@ -362,6 +371,10 @@
         }
 
         videoPlayerElement.addEventListener('progress', updateBufferProgress);
+        videoPlayerElement.addEventListener('loadeddata', updateVideoControls);
+        videoPlayerElement.addEventListener('loadedmetadata', updateVideoControls);
+        videoPlayerElement.addEventListener('canplay', updateVideoControls);
+        videoPlayerElement.addEventListener('canplaythrough', updateVideoControls);
         videoPlayerElement.addEventListener('timeupdate', updateVideoControls);
         videoPlayerElement.addEventListener('durationchange', updateVideoControls);
         videoPlayerElement.addEventListener('play', () => {
@@ -888,6 +901,12 @@
                         if (window.hlsInstance === hls) {
                             hls.loadSource(`/api/proxy_hls?url=${encodeURIComponent(hlsFormat.url)}`);
                         }
+                    });
+                    hls.on(Hls.Events.BUFFER_APPENDED, () => {
+                        updateBufferProgress();
+                    });
+                    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                        updateBufferProgress();
                     });
                 } else if (mp4Format) {
                     videoPlayer.src = `/api/dl?id=${data.id}&fmt=mp4&stream=1&device_id=${deviceId}`;

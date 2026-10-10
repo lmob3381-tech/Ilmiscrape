@@ -147,7 +147,7 @@ async def proxy_hls(url: str, request: Request):
     if not url.startswith("http"):
         raise HTTPException(status_code=400, detail="Invalid URL")
     
-    client = hls_client_direct if "xnxx-cdn.com" in url else hls_client_proxy
+    client = hls_client_direct if ("xnxx-cdn.com" in url or "phncdn.com" in url) else hls_client_proxy
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
         "Referer": "https://www.pornhub.com/" if "phncdn.com" in url else "https://www.xnxx.com/"
@@ -468,11 +468,9 @@ async def download(request: Request, id: str, fmt: str, stream: int = 0, device_
     encoded_filename = urllib.parse.quote(filename)
     disposition = "inline" if stream else "attachment"
     res_headers = {
-        "Content-Disposition": f"{disposition}; filename=\"{sanitize_filename(filename)}\"; filename*=UTF-8''{encoded_filename}"
+        "Content-Disposition": f"{disposition}; filename=\"{sanitize_filename(filename)}\"; filename*=UTF-8''{encoded_filename}",
+        "Accept-Ranges": "bytes"
     }
-
-    if stream and fmt != "mp3":
-        res_headers["Accept-Ranges"] = "none"
 
     if fmt == "mp3":
         duration = meta.get("duration") or chosen.get("duration")
@@ -522,6 +520,28 @@ async def download(request: Request, id: str, fmt: str, stream: int = 0, device_
     else:
         # Pass file size if available for direct stream
         size = chosen.get("size")
+        if not size and chosen.get("url"):
+            try:
+                p_url = chosen["url"]
+                proxy = None if ("phncdn.com" in p_url or "xnxx-cdn.com" in p_url) else ("socks5://127.0.0.1:40000" if "pornhub" in meta.get("platform", "") else None)
+                with httpx.Client(timeout=4.0, proxy=proxy) as check_c:
+                    h_r = check_c.get(p_url, headers={
+                        "Range": "bytes=0-0",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Referer": "https://www.pornhub.com/" if "phncdn.com" in p_url else "https://www.xnxx.com/"
+                    })
+                    if h_r.status_code in (206, 200):
+                        cr = h_r.headers.get("content-range")
+                        if cr:
+                            m_cr = re.search(r'/(\d+)$', cr)
+                            if m_cr: size = int(m_cr.group(1))
+                        elif "content-length" in h_r.headers and h_r.status_code == 200:
+                            size = int(h_r.headers["content-length"])
+                        if size:
+                            chosen["size"] = size
+            except Exception:
+                pass
+
         start, end = 0, None
         
         if size:
