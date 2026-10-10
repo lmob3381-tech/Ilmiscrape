@@ -32,8 +32,9 @@ Kami merekomendasikan menggunakan `pm2` untuk menjaga layanan tetap hidup (*auto
 ### 1. Persiapan Dependensi
 
 ```bash
-# Pastikan berada di direktori project
-cd /root/clipgrab
+# Clone repositori Ilmiscrape
+git clone https://github.com/lmob3381-tech/Ilmiscrape.git
+cd Ilmiscrape
 
 # Buat Virtual Environment (opsional namun direkomendasikan)
 python3 -m venv venv
