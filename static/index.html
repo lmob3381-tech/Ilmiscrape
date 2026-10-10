@@ -451,7 +451,10 @@
 
             data.formats.forEach(fmt => {
                 const btn = document.createElement('a');
-                btn.href = `/api/dl?id=${data.id}&fmt=${fmt.key}&device_id=${deviceId}`;
+                // Generate unique download ID
+                const dlId = 'dl_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+                
+                btn.href = `/api/dl?id=${data.id}&fmt=${fmt.key}&device_id=${deviceId}&dl_id=${dlId}`;
                 btn.className = 'group flex items-center justify-between bg-white hover:bg-black border-2 border-black text-black hover:text-white py-3.5 px-4 rounded-xl transition-all duration-200 ease-in-out cursor-pointer active:scale-95 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-none';
 
                 const sizeStr = fmt.size ? formatBytes(fmt.size) : (fmt.key === 'mp3' ? '~ Instan' : 'Unknown Size');
@@ -466,6 +469,26 @@
                 
                 btn.addEventListener('click', () => {
                     showToast('Download dimulai! Mohon tunggu sebentar...');
+                    
+                    // Polling download status
+                    const checkInterval = setInterval(async () => {
+                        try {
+                            const stRes = await fetch(`/api/dl_status?dl_id=${dlId}`);
+                            if (stRes.ok) {
+                                const stData = await stRes.json();
+                                if (stData.status === 'completed' || stData.status === 'error') {
+                                    clearInterval(checkInterval);
+                                    showToast('✅ Download Selesai / Terhenti!');
+                                    updateUsageInfo();
+                                }
+                            }
+                        } catch (e) {
+                            // ignore errors
+                        }
+                    }, 2000);
+                    
+                    // Stop polling after 30 minutes to prevent memory leak if something goes wrong
+                    setTimeout(() => clearInterval(checkInterval), 30 * 60 * 1000);
                 });
                 
                 formatList.appendChild(btn);

@@ -352,8 +352,33 @@ async def _load_meta(id: str):
     return meta
 
 
+
+async def track_stream(generator, dl_id: str):
+    if not hasattr(app.state, "dl_status"):
+        app.state.dl_status = {}
+    if dl_id:
+        app.state.dl_status[dl_id] = "downloading"
+    try:
+        async for chunk in generator:
+            yield chunk
+        if dl_id:
+            app.state.dl_status[dl_id] = "completed"
+    except BaseException:
+        if dl_id:
+            app.state.dl_status[dl_id] = "completed"
+
+@app.get("/api/dl_status")
+async def get_dl_status(dl_id: str):
+    if not hasattr(app.state, "dl_status"):
+        return {"status": "unknown"}
+    status = app.state.dl_status.get(dl_id, "unknown")
+    if status in ["completed", "error"]:
+        app.state.dl_status.pop(dl_id, None)
+    return {"status": status}
+
+
 @app.api_route("/api/dl", methods=["GET", "HEAD"])
-async def download(request: Request, id: str, fmt: str, stream: int = 0, device_id: str = ""):
+async def download(request: Request, id: str, fmt: str, stream: int = 0, device_id: str = "", dl_id: str = ""):
     # Retrieve from cache
     meta = None
     if cache:
@@ -429,7 +454,7 @@ async def download(request: Request, id: str, fmt: str, stream: int = 0, device_
                     res_headers["Content-Range"] = f"bytes {start_byte}-{est_total-1}/{est_total}"
                     res_headers["Content-Length"] = str(est_total - start_byte)
                     return StreamingResponse(
-                        stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta, start_time=start_time),
+                        (track_stream(stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta, start_time=start_time), dl_id) if stream == 0 and dl_id else stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta, start_time=start_time)),
                         status_code=206, media_type=media_type, headers=res_headers
                     )
 
@@ -439,14 +464,14 @@ async def download(request: Request, id: str, fmt: str, stream: int = 0, device_
                 res_headers["Content-Length"] = str(est_total)
 
             return StreamingResponse(
-                stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta, start_time=start_time),
+                (track_stream(stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta, start_time=start_time), dl_id) if stream == 0 and dl_id else stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta, start_time=start_time)),
                 status_code=206 if est_total else 200, media_type=media_type, headers=res_headers
             )
         else:
             # Mode download (full dari 0, instant stream)
             res_headers["Accept-Ranges"] = "none"
             return StreamingResponse(
-                stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta),
+                (track_stream(stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta), dl_id) if stream == 0 and dl_id else stream_mp3_on_the_fly(chosen["url"], chosen["headers"], meta)),
                 media_type=media_type, headers=res_headers
             )
     else:
@@ -473,12 +498,12 @@ async def download(request: Request, id: str, fmt: str, stream: int = 0, device_
                     res_headers["Content-Length"] = str(end - start + 1)
                     
                     return StreamingResponse(
-                        stream_direct(chosen["url"], chosen["headers"], size=size, start=start, end=end),
+                        (track_stream(stream_direct(chosen["url"], chosen["headers"], size=size, start=start, end=end), dl_id) if stream == 0 and dl_id else stream_direct(chosen["url"], chosen["headers"], size=size, start=start, end=end)),
                         status_code=206, media_type=media_type, headers=res_headers
                     )
 
         return StreamingResponse(
-            stream_direct(chosen["url"], chosen["headers"], size=size, start=start, end=end),
+            (track_stream(stream_direct(chosen["url"], chosen["headers"], size=size, start=start, end=end), dl_id) if stream == 0 and dl_id else stream_direct(chosen["url"], chosen["headers"], size=size, start=start, end=end)),
             media_type=media_type, headers=res_headers
         )
 
