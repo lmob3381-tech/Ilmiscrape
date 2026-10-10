@@ -132,8 +132,14 @@
 
             <div id="video-stream" class="hidden mt-4 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] rounded-xl p-4 transition-colors">
                 <h4 class="text-sm font-bold text-black uppercase mb-3">Putar Video</h4>
-                <video id="video-player" controls preload="metadata" playsinline class="w-full aspect-video rounded-lg border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)]"></video>
-                <p id="video-status" class="text-xs text-black mt-3 font-bold">Streaming video langsung.</p>
+                <div class="relative aspect-video overflow-hidden rounded-lg border-2 border-black bg-black shadow-[3px_3px_0px_rgba(0,0,0,1)]">
+                    <video id="video-player" controls preload="metadata" playsinline class="absolute inset-0 w-full h-full object-contain bg-black"></video>
+                    <div id="video-buffering" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-white pointer-events-none">
+                        <div class="w-8 h-8 rounded-full border-[3px] border-white/30 border-t-white animate-spin"></div>
+                        <span id="video-buffering-text" class="text-xs font-bold">Buffering...</span>
+                    </div>
+                </div>
+                <p id="video-status" class="text-xs text-black mt-3 font-bold">Streaming video langsung. Geser timeline untuk pindah durasi.</p>
             </div>
         </div>
     </div>
@@ -168,7 +174,30 @@
             }
             player.removeAttribute('src');
             player.load();
+            document.getElementById('video-buffering').classList.add('hidden');
         }
+
+        const videoPlayerElement = document.getElementById('video-player');
+        const videoBuffering = document.getElementById('video-buffering');
+        const videoBufferingText = document.getElementById('video-buffering-text');
+        videoPlayerElement.addEventListener('waiting', () => {
+            videoBufferingText.textContent = videoPlayerElement.seeking ? 'Mencari posisi...' : 'Buffering...';
+            videoBuffering.classList.remove('hidden');
+        });
+        videoPlayerElement.addEventListener('seeking', () => {
+            videoBufferingText.textContent = 'Mencari posisi...';
+            videoBuffering.classList.remove('hidden');
+        });
+        videoPlayerElement.addEventListener('playing', () => videoBuffering.classList.add('hidden'));
+        videoPlayerElement.addEventListener('canplay', () => videoBuffering.classList.add('hidden'));
+        videoPlayerElement.addEventListener('seeked', () => {
+            if (!videoPlayerElement.paused && videoPlayerElement.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+                videoBufferingText.textContent = 'Buffering...';
+                videoBuffering.classList.remove('hidden');
+            }
+        });
+        videoPlayerElement.addEventListener('error', () => videoBuffering.classList.add('hidden'));
+
 
         function checkScrollState() {
             const isResultHidden = result.classList.contains('hidden');
@@ -580,8 +609,12 @@
                         startLevel: -1,
                         capLevelToPlayerSize: false,
                         startFragPrefetch: true,
-                        maxBufferLength: 30,
-                        maxMaxBufferLength: 60
+                        maxBufferLength: 10,
+                        maxMaxBufferLength: 20,
+                        backBufferLength: 15,
+                        maxBufferSize: 60 * 1000 * 1000,
+                        highBufferWatchdogPeriod: 2,
+                        nudgeMaxRetry: 5
                     });
                     window.hlsInstance = hls;
                     hls.attachMedia(videoPlayer);
