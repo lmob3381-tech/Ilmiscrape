@@ -173,9 +173,8 @@
         function checkScrollState() {
             const isResultHidden = result.classList.contains('hidden');
             const isErrorHidden = errorDiv.classList.contains('hidden');
-            const isLoading = !loading.classList.contains('hidden');
             const emptyState = document.getElementById('empty-state');
-            if (isResultHidden && isErrorHidden && !isLoading) {
+            if (isResultHidden && isErrorHidden) {
                 document.body.classList.add('overflow-hidden');
                 emptyState.classList.remove('hidden');
             } else {
@@ -323,7 +322,7 @@
                             stopCurrentVideoStream();
                             errorDiv.classList.add('hidden');
                             loading.classList.remove('hidden'); loading.classList.add('flex');
-                            checkScrollState();
+                            document.getElementById('empty-state').classList.add('hidden');
                             submitBtn.disabled = true;
                             submitBtn.classList.add('opacity-50');
 
@@ -382,6 +381,7 @@
             document.getElementById('search-results').classList.add('hidden');
             errorDiv.classList.add('hidden');
             loading.classList.remove('hidden'); loading.classList.add('flex');
+            document.getElementById('empty-state').classList.add('hidden');
             submitBtn.disabled = true;
             submitBtn.classList.add('opacity-50');
             checkScrollState();
