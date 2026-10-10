@@ -74,7 +74,7 @@
         </form>
 
         <!-- Loading state -->
-        <div id="loading" class="hidden flex-col items-center justify-center py-10 gap-4">
+        <div id="loading" class="hidden flex-col items-center justify-center py-10 gap-4 w-full text-center">
             <div class="relative w-12 h-12">
                 <!-- track -->
                 <svg class="absolute inset-0 w-12 h-12 loader-ring-track" viewBox="0 0 48 48" fill="none">
@@ -309,14 +309,14 @@
                             // This bypasses any weird form event blocking by the browser
                             result.classList.add('hidden');
                             errorDiv.classList.add('hidden');
-                            loading.classList.remove('hidden');
+                            loading.classList.remove('hidden'); loading.classList.add('flex');
                             submitBtn.disabled = true;
                             submitBtn.classList.add('opacity-50');
 
                             try {
                                 await processUrl(video.url);
                             } catch (err) {
-                                loading.classList.add('hidden');
+                                loading.classList.add('hidden'); loading.classList.remove('flex');
                                 errorMsg.textContent = err.message;
                                 errorDiv.classList.remove('hidden');
                             } finally {
@@ -366,7 +366,7 @@
             result.classList.add('hidden');
             document.getElementById('search-results').classList.add('hidden');
             errorDiv.classList.add('hidden');
-            loading.classList.remove('hidden');
+            loading.classList.remove('hidden'); loading.classList.add('flex');
             submitBtn.disabled = true;
             submitBtn.classList.add('opacity-50');
             checkScrollState();
@@ -374,7 +374,7 @@
             try {
                 await processUrl(inputVal);
             } catch (err) {
-                loading.classList.add('hidden');
+                loading.classList.add('hidden'); loading.classList.remove('flex');
                 errorMsg.textContent = err.message;
                 errorDiv.classList.remove('hidden');
                 checkScrollState();
@@ -426,14 +426,14 @@
 
                     result.classList.add('hidden');
                     errorDiv.classList.add('hidden');
-                    loading.classList.remove('hidden');
+                    loading.classList.remove('hidden'); loading.classList.add('flex');
                     submitBtn.disabled = true;
                     submitBtn.classList.add('opacity-50');
 
                     try {
                         await processUrl(video.url);
                     } catch (err) {
-                        loading.classList.add('hidden');
+                        loading.classList.add('hidden'); loading.classList.remove('flex');
                         errorMsg.textContent = err.message;
                         errorDiv.classList.remove('hidden');
                     } finally {
@@ -444,7 +444,7 @@
                 searchList.appendChild(item);
             });
 
-            loading.classList.add('hidden');
+            loading.classList.add('hidden'); loading.classList.remove('flex');
         }
 
         async function processUrl(url) {
@@ -623,7 +623,7 @@
                 audioStream.classList.add('hidden');
             }
 
-            loading.classList.add('hidden');
+            loading.classList.add('hidden'); loading.classList.remove('flex');
             result.classList.remove('hidden');
             checkScrollState();
         }
