@@ -351,7 +351,18 @@
             const duration = videoPlayerElement.duration;
             if (Number.isFinite(duration) && duration > 0) {
                 const targetTime = (Number(videoSeek.value) / 1000) * duration;
-                videoPlayerElement.currentTime = targetTime;
+                if ('fastSeek' in videoPlayerElement) {
+                    try {
+                        videoPlayerElement.fastSeek(targetTime);
+                    } catch (e) {
+                        videoPlayerElement.currentTime = targetTime;
+                    }
+                } else {
+                    videoPlayerElement.currentTime = targetTime;
+                }
+                if (!videoPlayerElement.paused) {
+                    videoPlayerElement.play().catch(() => {});
+                }
             }
         };
 
@@ -801,7 +812,7 @@
                 const mp4Format = data.formats.find(f => f.key === 'mp4');
                 
                 if (hlsFormat && Hls.isSupported()) {
-                    // Optimized HLS buffer: 30s lookahead, progressive demux, fast prefetch, web worker
+                    // Optimized HLS: 30s lookahead, worker demuxing, fast seek nudging
                     const hls = new Hls({
                         startLevel: -1,
                         capLevelToPlayerSize: false,
@@ -810,12 +821,12 @@
                         maxMaxBufferLength: 60,
                         backBufferLength: 30,
                         maxBufferSize: 60 * 1000 * 1000,
-                        progressive: true,
                         enableWorker: true,
                         fragLoadingTimeOut: 15000,
                         manifestLoadingTimeOut: 15000,
                         highBufferWatchdogPeriod: 2,
-                        nudgeMaxRetry: 5
+                        nudgeMaxRetry: 8,
+                        nudgeOffset: 0.1
                     });
                     window.hlsInstance = hls;
                     hls.attachMedia(videoPlayer);
