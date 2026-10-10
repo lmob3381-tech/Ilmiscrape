@@ -42,12 +42,12 @@
         }
     </script>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans antialiased min-h-screen flex flex-col items-center justify-between py-10 px-4 transition-colors duration-200">
+<body class="bg-gray-50 text-gray-900 font-sans antialiased min-h-screen flex flex-col items-center py-8 px-4 transition-colors duration-200">
 
     <!-- Toast Container -->
     <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-3 pointer-events-none w-full max-w-sm px-4"></div>
 
-    <div class="w-full max-w-lg bg-white border-2 border-black rounded-2xl p-6 mt-auto mb-10 transition-colors duration-200 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+    <div class="w-full max-w-lg bg-white border-2 border-black rounded-2xl p-6 mb-8 transition-colors duration-200 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
         <h1 class="text-3xl font-extrabold text-center text-blue-600 mb-2">Ilmi<span class="text-black">Dev</span></h1>
         <p class="text-center text-gray-500 mb-8 font-medium">Download YouTube & TikTok</p>
 
@@ -132,40 +132,45 @@
 
             <div id="video-stream" class="hidden mt-4 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] rounded-xl p-4 transition-colors">
                 <h4 class="text-sm font-bold text-black uppercase mb-3">Putar Video</h4>
-                <div class="overflow-hidden rounded-xl border-2 border-black bg-black shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-                    <div class="relative aspect-video bg-black">
-                        <video id="video-player" preload="metadata" playsinline class="absolute inset-0 w-full h-full object-contain bg-black"></video>
-                        <button id="video-big-play" type="button" aria-label="Putar video" class="absolute inset-0 m-auto w-16 h-16 rounded-full border-2 border-white bg-blue-600 text-white flex items-center justify-center shadow-[3px_3px_0px_rgba(0,0,0,0.8)] hover:scale-105 active:scale-95 transition-transform z-10">
-                            <svg id="video-big-play-icon" class="w-7 h-7 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                        </button>
-                        <div id="video-buffering" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/65 text-white pointer-events-none z-20">
-                            <div class="w-8 h-8 rounded-full border-[3px] border-white/30 border-t-white animate-spin"></div>
-                            <span id="video-buffering-text" class="text-xs font-bold">Buffering...</span>
-                        </div>
+                <!-- Video player container: edge-to-edge video, no black bars, overlay controls -->
+                <div id="video-container" class="relative aspect-video w-full overflow-hidden rounded-xl border-2 border-black bg-black shadow-[4px_4px_0px_rgba(0,0,0,1)] select-none cursor-pointer">
+                    <video id="video-player" preload="metadata" playsinline class="w-full h-full object-cover block bg-black"></video>
+
+                    <!-- Center Big Play Button (shown when paused) -->
+                    <button id="video-big-play" type="button" aria-label="Putar video" class="absolute inset-0 m-auto w-16 h-16 rounded-full border-2 border-black bg-white text-black flex items-center justify-center shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:scale-105 active:scale-95 transition-all z-20">
+                        <svg id="video-big-play-icon" class="w-7 h-7 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+
+                    <!-- Buffering Indicator -->
+                    <div id="video-buffering" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white pointer-events-none z-30">
+                        <div class="w-8 h-8 rounded-full border-[3px] border-white/30 border-t-white animate-spin"></div>
+                        <span id="video-buffering-text" class="text-xs font-bold">Buffering...</span>
                     </div>
-                    <div class="bg-black px-3 pt-1.5 pb-1 text-white">
+
+                    <!-- Overlay Controls (auto-hides after 2.5s while playing) -->
+                    <div id="video-controls-overlay" class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-8 pb-3 px-3.5 text-white transition-opacity duration-300 opacity-100 z-10 flex flex-col gap-1.5">
                         <input id="video-seek" type="range" min="0" max="1000" value="0" aria-label="Posisi video" class="w-full h-1.5 cursor-pointer accent-blue-500">
-                        <div class="flex items-center gap-2 mt-0.5">
-                            <button id="video-play-toggle" type="button" aria-label="Putar" class="w-7 h-7 flex items-center justify-center rounded hover:bg-white/15 active:scale-95 transition">
+                        <div class="flex items-center gap-2">
+                            <button id="video-play-toggle" type="button" aria-label="Putar" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 transition">
                                 <svg id="video-play-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                             </button>
-                            <span id="video-time" class="text-[11px] font-mono tabular-nums">0:00 / 0:00</span>
+                            <span id="video-time" class="text-[11px] font-mono font-bold tabular-nums">0:00 / 0:00</span>
                             <div class="flex-1"></div>
-                            <button id="video-mute-toggle" type="button" aria-label="Matikan suara" class="w-7 h-7 flex items-center justify-center rounded hover:bg-white/15 active:scale-95 transition">
+                            <button id="video-mute-toggle" type="button" aria-label="Matikan suara" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 transition">
                                 <svg id="video-volume-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a3.5 3.5 0 0 0-2-3.16v6.31a3.5 3.5 0 0 0 2-3.15zM14.5 3.23v2.06a7 7 0 0 1 0 13.42v2.06a9 9 0 0 0 0-17.54z"/></svg>
                             </button>
-                            <button id="video-fullscreen" type="button" aria-label="Layar penuh" class="w-7 h-7 flex items-center justify-center rounded hover:bg-white/15 active:scale-95 transition">
+                            <button id="video-fullscreen" type="button" aria-label="Layar penuh" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 transition">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 4v-4h2v6h-6v-2h4z"/></svg>
                             </button>
                         </div>
                     </div>
                 </div>
-                <p id="video-status" class="text-xs text-black mt-4 font-bold">Streaming langsung · Geser durasi untuk mencari posisi.</p>
+                <p id="video-status" class="text-xs text-black mt-3 font-bold">Ketuk video untuk menampilkan kontrol.</p>
             </div>
         </div>
     </div>
 
-    <div class="text-center mt-auto text-sm text-black w-full max-w-lg pb-6 transition-colors font-medium">
+    <div class="text-center mt-4 text-sm text-black w-full max-w-lg pb-8 transition-colors font-medium">
         <div id="usage-info" class="text-xs mb-4 bg-white border-2 border-black rounded-lg py-2 px-4 inline-block font-bold uppercase shadow-[2px_2px_0px_rgba(0,0,0,1)]">
             <span id="ui-count">Ekstrak: -/20</span> <span class="mx-1 text-gray-400">|</span> 
             <span id="ui-duration">Sisa Kuota Download: -</span>
@@ -196,7 +201,64 @@
             player.removeAttribute('src');
             player.load();
             document.getElementById('video-buffering').classList.add('hidden');
+            clearTimeout(controlsHideTimeout);
+            showVideoControls();
         }
+
+        const videoContainer = document.getElementById('video-container');
+        const videoControlsOverlay = document.getElementById('video-controls-overlay');
+        let controlsHideTimeout = null;
+
+        function showVideoControls() {
+            videoControlsOverlay.classList.remove('opacity-0', 'pointer-events-none');
+            videoControlsOverlay.classList.add('opacity-100', 'pointer-events-auto');
+            resetControlsHideTimer();
+        }
+
+        function hideVideoControls() {
+            if (!videoPlayerElement.paused) {
+                videoControlsOverlay.classList.remove('opacity-100', 'pointer-events-auto');
+                videoControlsOverlay.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function resetControlsHideTimer() {
+            clearTimeout(controlsHideTimeout);
+            if (!videoPlayerElement.paused) {
+                controlsHideTimeout = setTimeout(() => {
+                    hideVideoControls();
+                }, 2500);
+            }
+        }
+
+        videoContainer.addEventListener('click', (e) => {
+            if (e.target.closest('#video-controls-overlay') || e.target.closest('#video-big-play')) {
+                resetControlsHideTimer();
+                return;
+            }
+            if (videoControlsOverlay.classList.contains('opacity-0')) {
+                showVideoControls();
+            } else {
+                if (!videoPlayerElement.paused) {
+                    hideVideoControls();
+                } else {
+                    toggleVideoPlayback();
+                }
+            }
+        });
+
+        videoContainer.addEventListener('mousemove', () => {
+            showVideoControls();
+        });
+
+        videoContainer.addEventListener('touchstart', (e) => {
+            if (!e.target.closest('#video-controls-overlay') && !e.target.closest('#video-big-play')) {
+                if (videoControlsOverlay.classList.contains('opacity-0')) {
+                    e.preventDefault();
+                    showVideoControls();
+                }
+            }
+        }, { passive: false });
 
         const videoPlayerElement = document.getElementById('video-player');
         const videoBuffering = document.getElementById('video-buffering');
@@ -209,7 +271,10 @@
             videoBufferingText.textContent = 'Mencari posisi...';
             videoBuffering.classList.remove('hidden');
         });
-        videoPlayerElement.addEventListener('playing', () => videoBuffering.classList.add('hidden'));
+        videoPlayerElement.addEventListener('playing', () => {
+            videoBuffering.classList.add('hidden');
+            resetControlsHideTimer();
+        });
         videoPlayerElement.addEventListener('canplay', () => videoBuffering.classList.add('hidden'));
         videoPlayerElement.addEventListener('seeked', () => {
             if (!videoPlayerElement.paused && videoPlayerElement.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
@@ -245,10 +310,20 @@
         }
         videoPlayerElement.addEventListener('timeupdate', updateVideoControls);
         videoPlayerElement.addEventListener('durationchange', updateVideoControls);
-        videoPlayerElement.addEventListener('play', updateVideoControls);
-        videoPlayerElement.addEventListener('pause', updateVideoControls);
-        videoPlayerElement.addEventListener('ended', updateVideoControls);
+        videoPlayerElement.addEventListener('play', () => {
+            updateVideoControls();
+            resetControlsHideTimer();
+        });
+        videoPlayerElement.addEventListener('pause', () => {
+            updateVideoControls();
+            showVideoControls();
+        });
+        videoPlayerElement.addEventListener('ended', () => {
+            updateVideoControls();
+            showVideoControls();
+        });
         videoSeek.addEventListener('input', () => {
+            resetControlsHideTimer();
             const duration = videoPlayerElement.duration;
             if (Number.isFinite(duration) && duration > 0) {
                 videoPlayerElement.currentTime = (Number(videoSeek.value) / 1000) * duration;
@@ -258,16 +333,33 @@
             if (videoPlayerElement.paused) videoPlayerElement.play().catch(() => {});
             else videoPlayerElement.pause();
         };
-        document.getElementById('video-play-toggle').addEventListener('click', toggleVideoPlayback);
-        document.getElementById('video-big-play').addEventListener('click', toggleVideoPlayback);
-        document.getElementById('video-mute-toggle').addEventListener('click', () => {
+        document.getElementById('video-play-toggle').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleVideoPlayback();
+            resetControlsHideTimer();
+        });
+        document.getElementById('video-big-play').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleVideoPlayback();
+            resetControlsHideTimer();
+        });
+        document.getElementById('video-mute-toggle').addEventListener('click', (e) => {
+            e.stopPropagation();
             videoPlayerElement.muted = !videoPlayerElement.muted;
             document.getElementById('video-mute-toggle').setAttribute('aria-label', videoPlayerElement.muted ? 'Nyalakan suara' : 'Matikan suara');
+            resetControlsHideTimer();
         });
-        document.getElementById('video-fullscreen').addEventListener('click', () => {
-            const frame = document.getElementById('video-player').parentElement;
-            if (document.fullscreenElement) document.exitFullscreen?.();
-            else (frame.requestFullscreen?.() || videoPlayerElement.webkitEnterFullscreen?.());
+        document.getElementById('video-fullscreen').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (document.fullscreenElement) {
+                document.exitFullscreen?.();
+            } else {
+                if (videoContainer.requestFullscreen) {
+                    videoContainer.requestFullscreen();
+                } else if (videoPlayerElement.webkitEnterFullscreen) {
+                    videoPlayerElement.webkitEnterFullscreen();
+                }
+            }
         });
 
         function checkScrollState() {
